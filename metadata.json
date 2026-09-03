@@ -1,0 +1,7 @@
+{
+  "name": "Vortix",
+  "description": "Build. Scale. Orchestrate. - Enterprise Operational Intelligence & Modular Orchestration Platform",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
