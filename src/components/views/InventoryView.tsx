@@ -10,6 +10,7 @@ import {
   Warehouse,
   Shield,
   Zap,
+  Upload,
 } from 'lucide-react';
 import { InventoryItem, InventoryCategory, RoleDefinition } from '../../types';
 
@@ -19,6 +20,7 @@ interface InventoryViewProps {
   onRestockItem: (itemId: string, quantityToAdd: number) => void;
   onTriggerReorderWorkflow: (item: InventoryItem) => void;
   onOpenAddItemModal: () => void;
+  onOpenBatchUploadModal?: () => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -27,6 +29,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onRestockItem,
   onTriggerReorderWorkflow,
   onOpenAddItemModal,
+  onOpenBatchUploadModal,
 }) => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,13 +83,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
 
           {canWrite && (
-            <button
-              onClick={onOpenAddItemModal}
-              className="text-xs bg-[#5A5A40] hover:bg-[#474732] text-white font-medium px-4 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[#E9E9E0]" />
-              <span>Add Stock Item</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {onOpenBatchUploadModal && (
+                <button
+                  onClick={onOpenBatchUploadModal}
+                  className="text-xs bg-[#FAF9F5] hover:bg-[#F5F5F0] text-[#5A5A40] border border-[#5A5A40]/30 font-semibold px-3.5 py-2 rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Upload and batch update inventory records via CSV"
+                >
+                  <Upload className="w-3.5 h-3.5 text-[#5A5A40]" />
+                  <span>Batch CSV Import</span>
+                </button>
+              )}
+              <button
+                onClick={onOpenAddItemModal}
+                className="text-xs bg-[#5A5A40] hover:bg-[#474732] text-white font-medium px-4 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#E9E9E0]" />
+                <span>Add Stock Item</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

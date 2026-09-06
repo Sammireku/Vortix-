@@ -18,6 +18,7 @@ import {
   Sparkles,
   ChevronRight,
   TrendingUp,
+  Upload,
 } from 'lucide-react';
 import { Employee, HrAttendanceRecord, HrCertification } from '../../types';
 
@@ -27,6 +28,7 @@ interface HumanResourcesViewProps {
   onAddEmployee: (employee: Employee) => void;
   onUpdateEmployeeStatus: (id: string, status: Employee['status']) => void;
   onShowNotification?: (title: string, message: string, type?: 'success' | 'alert') => void;
+  onOpenBatchUploadModal?: () => void;
 }
 
 export const HumanResourcesView: React.FC<HumanResourcesViewProps> = ({
@@ -35,6 +37,7 @@ export const HumanResourcesView: React.FC<HumanResourcesViewProps> = ({
   onAddEmployee,
   onUpdateEmployeeStatus,
   onShowNotification,
+  onOpenBatchUploadModal,
 }) => {
   const [activeTab, setActiveTab] = useState<'roster' | 'shifts' | 'certifications' | 'attendance'>('roster');
   const [searchQuery, setSearchQuery] = useState('');
@@ -180,6 +183,16 @@ export const HumanResourcesView: React.FC<HumanResourcesViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onOpenBatchUploadModal && (
+            <button
+              onClick={onOpenBatchUploadModal}
+              className="flex items-center gap-1.5 text-xs bg-[#FAF9F5] hover:bg-[#F5F5F0] text-[#5A5A40] border border-[#5A5A40]/30 font-semibold px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-2xs"
+              title="Batch import and update employees via CSV"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#5A5A40]" />
+              <span>Batch CSV Import</span>
+            </button>
+          )}
           <button
             onClick={handleExportCsv}
             className="flex items-center gap-1.5 text-xs bg-[#F5F5F0] hover:bg-[#E9E9E0] text-[#2D2D24] border border-[#E5E5DE] font-semibold px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-2xs"

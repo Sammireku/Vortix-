@@ -37,6 +37,7 @@ export type ViewTab =
   | 'production'
   | 'digital_traveler'
   | 'digital_twin'
+  | 'iot_edge_analytics'
   | 'fleet_management'
   | 'supply_chain'
   | 'inventory'
@@ -1135,6 +1136,48 @@ export interface PosRegisterShift {
   status: 'open' | 'closed';
 }
 
+export interface PosInvoiceItem {
+  id: string;
+  sku?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  taxRate: number;
+  total: number;
+  category?: string;
+  notes?: string;
+}
+
+export interface PosInvoice {
+  id: string;
+  invoiceNumber: string;
+  referenceOrder?: string;
+  issueDate: string;
+  dueDate: string;
+  paymentTerms: 'Due on Receipt' | 'Net 15' | 'Net 30' | 'Net 60';
+  status: 'draft' | 'issued' | 'paid' | 'pending';
+  // Customer / Billing Details
+  customerName: string;
+  customerCompany?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  poReference?: string;
+  // Items
+  items: PosInvoiceItem[];
+  // Financials
+  subtotal: number;
+  discountType: 'percentage' | 'amount';
+  discountValue: number;
+  discountTotal: number;
+  discountReason?: string;
+  taxTotal: number;
+  grandTotal: number;
+  notes?: string;
+  cashierName: string;
+  terminalName: string;
+}
+
 // =============================================================
 // PROPERTY MANAGEMENT SYSTEM (PMS) TYPES
 // =============================================================
@@ -1239,5 +1282,68 @@ export interface IcalParsedEvent {
   unitNumber: string;
   description?: string;
 }
+
+// IoT Edge Analytics & Sensor Onboarding Types
+export interface IoTTelemetryReading {
+  time: string;
+  timestamp: number;
+  assetId: string;
+  assetName: string;
+  temperatureC: number;
+  vibrationMmS: number;
+  humidityPct: number;
+  pressureBar?: number;
+  powerKw?: number;
+  acousticDb?: number;
+  status: 'normal' | 'warning' | 'critical';
+}
+
+export type IoTSensorProtocol = 'MQTT' | 'Modbus TCP' | 'BACnet/IP' | 'LoRaWAN' | 'BLE 5.2' | 'OPC-UA';
+
+export type IoTSensorType =
+  | 'vibration_piezo'
+  | 'thermal_rtd'
+  | 'humidity_rh'
+  | 'multi_environmental'
+  | 'acoustic_ultrasound'
+  | 'power_clamp';
+
+export interface IoTSensorDevice {
+  id: string;
+  name: string;
+  sensorType: IoTSensorType;
+  protocol: IoTSensorProtocol;
+  boundAssetId: string;
+  boundAssetName: string;
+  location: string;
+  status: 'online' | 'warning' | 'offline' | 'calibrating';
+  batteryPct?: number;
+  signalRssi: number; // dBm
+  samplingRateMs: number;
+  ipAddress?: string;
+  macAddress: string;
+  lastPing: string;
+  thresholds: {
+    tempWarningC: number;
+    tempCriticalC: number;
+    vibWarningMmS: number;
+    vibCriticalMmS: number;
+    humidityMaxPct: number;
+  };
+}
+
+export interface IoTGateway {
+  id: string;
+  name: string;
+  location: string;
+  ip: string;
+  protocol: string;
+  connectedSensorsCount: number;
+  status: 'online' | 'degraded' | 'offline';
+  packetsPerSec: number;
+  uptime: string;
+  firmware: string;
+}
+
 
 

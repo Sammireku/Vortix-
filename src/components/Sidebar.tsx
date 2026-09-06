@@ -26,6 +26,7 @@ import {
   Bed,
   Globe,
   ShieldCheck,
+  Radio,
 } from 'lucide-react';
 import { ViewTab, RoleDefinition, AppUser } from '../types';
 import { VortixLogo } from './VortixLogo';
@@ -89,6 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'human_resources', label: 'Workforce & HR Safety', icon: Users, badge: 'OSHA', category: 'Operations' },
     { id: 'digital_traveler', label: 'Digital Traveler & SOPs', icon: ClipboardCheck, badge: 'Shop Floor', category: 'Operations' },
     { id: 'digital_twin', label: '2D Plant Digital Twin', icon: Activity, badge: 'Live IoT', category: 'Operations' },
+    { id: 'iot_edge_analytics', label: 'IoT Edge Analytics', icon: Radio, badge: 'Telemetry', category: 'Operations' },
     { id: 'bom_mrp', label: 'Multi-Level BOM & MRP', icon: Layers, badge: 'Tree', category: 'Operations' },
     { id: 'production', label: 'Production & Line ERP', icon: Factory, permissionKey: 'production', badge: openWorkOrdersCount ? `${openWorkOrdersCount} Active` : undefined, category: 'Operations' },
     { id: 'maintenance', label: 'Maintenance (CMMS)', icon: Wrench, category: 'Operations' },

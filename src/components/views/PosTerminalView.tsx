@@ -26,6 +26,9 @@ import {
   DollarSign,
   Package,
   ChevronRight,
+  FileText,
+  Sliders,
+  Tag,
 } from 'lucide-react';
 import {
   PosProduct,
@@ -34,7 +37,9 @@ import {
   PosRegisterShift,
   AppUser,
   PropertyReservation,
+  Invoice,
 } from '../../types';
+import { PosInvoiceGeneratorModal } from '../modals/PosInvoiceGeneratorModal';
 
 interface PosTerminalViewProps {
   currentUser: AppUser;
@@ -45,6 +50,7 @@ interface PosTerminalViewProps {
   onAddFolioCharge?: (reservationId: string, description: string, amount: number) => void;
   onProcessOrder?: (order: PosOrder) => void;
   onShowNotification?: (title: string, message: string, type?: 'success' | 'warning' | 'info') => void;
+  onAddInvoice?: (invoice: Invoice) => void;
 }
 
 export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
@@ -56,11 +62,31 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
   onAddFolioCharge,
   onProcessOrder,
   onShowNotification,
+  onAddInvoice,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<PosCartItem[]>([]);
-  const [discountPercent, setDiscountPercent] = useState<number>(0);
+
+  // Discount state: supports preset percentages as well as manual custom % or $ amounts
+  const [discountType, setDiscountType] = useState<'percentage' | 'amount'>('percentage');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [manualDiscountInput, setManualDiscountInput] = useState<string>('');
+  const [discountReason, setDiscountReason] = useState<string>('');
+  const [isManualDiscountOpen, setIsManualDiscountOpen] = useState<boolean>(false);
+
+  // Invoice Generator modal state
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState<boolean>(false);
+  const [invoiceInitialItems, setInvoiceInitialItems] = useState<PosCartItem[]>([]);
+  const [invoiceCustomerPreset, setInvoiceCustomerPreset] = useState<{
+    name: string;
+    company?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    poReference?: string;
+  } | undefined>(undefined);
+
   const [selectedCustomerType, setSelectedCustomerType] = useState<'walk_in' | 'corporate' | 'room_guest'>('walk_in');
   const [selectedReservationId, setSelectedReservationId] = useState<string>(activeReservations[0]?.id || '');
   const [corporateCustomerName, setCorporateCustomerName] = useState('Boeing Commercial Airplanes');
@@ -165,15 +191,25 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
 
   // Calculations
   const rawSubtotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const discountAmount = rawSubtotal * (discountPercent / 100);
+
+  let discountAmount = 0;
+  if (discountType === 'percentage') {
+    const clampedPct = Math.min(100, Math.max(0, discountValue));
+    discountAmount = rawSubtotal * (clampedPct / 100);
+  } else {
+    discountAmount = Math.min(rawSubtotal, Math.max(0, discountValue));
+  }
+
   const discountedSubtotal = Math.max(0, rawSubtotal - discountAmount);
+  const effectiveDiscountPct = rawSubtotal > 0 ? (discountAmount / rawSubtotal) * 100 : 0;
+
   const taxTotal = cart.reduce((sum, item) => {
-    const itemSub = item.unitPrice * item.quantity * (1 - discountPercent / 100);
+    const itemSub = item.unitPrice * item.quantity * (1 - effectiveDiscountPct / 100);
     return sum + itemSub * item.product.taxRate;
   }, 0);
   const grandTotal = discountedSubtotal + taxTotal;
 
-  const handleApplyDiscount = (pct: number) => {
+  const handleApplyPresetDiscount = (pct: number) => {
     if (!currentUser.dataAccess.canOverrideDiscounts && pct > 0) {
       onShowNotification?.(
         'Permission Restricted',
@@ -182,7 +218,30 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
       );
       return;
     }
-    setDiscountPercent(pct);
+    setDiscountType('percentage');
+    setDiscountValue(pct);
+    setManualDiscountInput(pct > 0 ? pct.toString() : '');
+  };
+
+  const handleApplyManualDiscount = (type: 'percentage' | 'amount', val: number, reason?: string) => {
+    if (!currentUser.dataAccess.canOverrideDiscounts && val > 0) {
+      onShowNotification?.(
+        'Permission Restricted',
+        'Your user role does not have authorization to override POS discounts.',
+        'warning'
+      );
+      return;
+    }
+    setDiscountType(type);
+    setDiscountValue(Math.max(0, val));
+    if (reason !== undefined) setDiscountReason(reason);
+  };
+
+  const handleClearDiscount = () => {
+    setDiscountType('percentage');
+    setDiscountValue(0);
+    setManualDiscountInput('');
+    setDiscountReason('');
   };
 
   const handleParkOrder = () => {
@@ -306,7 +365,7 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
 
       setCompletedOrder(orderRecord);
       setCart([]);
-      setDiscountPercent(0);
+      handleClearDiscount();
       onShowNotification?.(
         'Payment Approved',
         `Transaction ${orderRecord.orderNumber} processed successfully ($${grandTotal.toFixed(2)}).`
@@ -320,6 +379,23 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
       addToCart(randomProduct);
       onShowNotification?.('Barcode Scanned', `Scanned [${randomProduct.barcode}] - ${randomProduct.name}`);
     }
+  };
+
+  const handleOpenInvoiceModal = (customItems?: PosCartItem[]) => {
+    const itemsToInvoice = customItems || cart;
+    setInvoiceInitialItems(itemsToInvoice);
+    setInvoiceCustomerPreset(
+      selectedCustomerType === 'corporate'
+        ? { name: corporateCustomerName, company: 'Commercial Account' }
+        : selectedCustomerType === 'room_guest'
+        ? {
+            name: activeReservations.find((r) => r.id === selectedReservationId)?.guestName || 'In-House Guest',
+            company: 'Campus Residence Guest',
+            address: `Suite ${activeReservations.find((r) => r.id === selectedReservationId)?.unitNumber || '101'}`,
+          }
+        : { name: 'Walk-In Customer' }
+    );
+    setIsInvoiceModalOpen(true);
   };
 
   return (
@@ -343,13 +419,22 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => handleOpenInvoiceModal()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#5A5A40]/30 text-xs font-semibold text-[#5A5A40] rounded-xl transition-colors cursor-pointer shadow-xs"
+            title="Generate custom single or multi-item official invoice"
+          >
+            <FileText className="w-4 h-4 text-[#5A5A40]" />
+            <span>Invoice Generator</span>
+          </button>
+
           <button
             onClick={handleSimulateScan}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#E5E5DE] text-xs font-semibold text-[#5A5A40] rounded-xl transition-colors cursor-pointer"
           >
             <Barcode className="w-4 h-4" />
-            <span>Simulate Barcode Scan</span>
+            <span>Simulate Scan</span>
           </button>
 
           <button
@@ -631,18 +716,21 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
               )}
             </div>
 
-            {/* Discount and Hold Buttons */}
+            {/* Discount and Cart Action Controls */}
             {cart.length > 0 && (
               <div className="pt-2 border-t border-[#E5E5DE] space-y-2 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-[#8B7E66]">Quick Discount:</span>
-                  <div className="flex items-center gap-1">
-                    {[0, 5, 10, 15].map((pct) => (
+                {/* Preset & Manual Toggle */}
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-semibold text-[#8B7E66] flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-[#5A5A40]" /> Discount:
+                  </span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {[0, 5, 10, 15, 20].map((pct) => (
                       <button
                         key={pct}
-                        onClick={() => handleApplyDiscount(pct)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer ${
-                          discountPercent === pct
+                        onClick={() => handleApplyPresetDiscount(pct)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                          discountType === 'percentage' && discountValue === pct && !isManualDiscountOpen
                             ? 'bg-[#5A5A40] text-white'
                             : 'bg-[#F5F5F0] text-[#5A5A40] hover:bg-[#E9E9E0]'
                         }`}
@@ -650,23 +738,157 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
                         {pct === 0 ? 'None' : `${pct}%`}
                       </button>
                     ))}
+                    <button
+                      onClick={() => setIsManualDiscountOpen(!isManualDiscountOpen)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer transition-colors ${
+                        isManualDiscountOpen || (discountValue > 0 && (discountType === 'amount' || ![5, 10, 15, 20].includes(discountValue)))
+                          ? 'bg-[#2D2D24] text-white'
+                          : 'bg-[#FAF9F5] border border-[#E5E5DE] text-[#5A5A40] hover:bg-[#F5F5F0]'
+                      }`}
+                      title="Apply manual percentage or flat dollar discount"
+                    >
+                      <Sliders className="w-2.5 h-2.5" />
+                      <span>Manual</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* Expandable Manual Discount Entry Panel */}
+                {isManualDiscountOpen && (
+                  <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-[#E5E5DE] space-y-2 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider">
+                        Manual Discount Override
+                      </span>
+                      <div className="flex items-center bg-white p-0.5 rounded-lg border border-[#E5E5DE] text-[10px]">
+                        <button
+                          onClick={() => {
+                            setDiscountType('percentage');
+                            const num = parseFloat(manualDiscountInput) || 0;
+                            setDiscountValue(Math.min(100, Math.max(0, num)));
+                          }}
+                          className={`px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                            discountType === 'percentage'
+                              ? 'bg-[#5A5A40] text-white'
+                              : 'text-[#8B7E66] hover:text-[#2D2D24]'
+                          }`}
+                        >
+                          % Pct
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDiscountType('amount');
+                            const num = parseFloat(manualDiscountInput) || 0;
+                            setDiscountValue(Math.min(rawSubtotal, Math.max(0, num)));
+                          }}
+                          className={`px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors ${
+                            discountType === 'amount'
+                              ? 'bg-[#5A5A40] text-white'
+                              : 'text-[#8B7E66] hover:text-[#2D2D24]'
+                          }`}
+                        >
+                          $ Flat
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#8B7E66]">
+                          {discountType === 'percentage' ? '%' : '$'}
+                        </span>
+                        <input
+                          type="number"
+                          step={discountType === 'percentage' ? '0.5' : '1.00'}
+                          min="0"
+                          max={discountType === 'percentage' ? '100' : rawSubtotal}
+                          placeholder={discountType === 'percentage' ? 'e.g. 12.5' : 'e.g. 25.00'}
+                          value={manualDiscountInput}
+                          onChange={(e) => {
+                            const valStr = e.target.value;
+                            setManualDiscountInput(valStr);
+                            const num = parseFloat(valStr) || 0;
+                            handleApplyManualDiscount(discountType, num);
+                          }}
+                          className="w-full pl-6 pr-2 py-1 bg-white border border-[#E5E5DE] rounded-lg text-xs font-bold text-[#2D2D24] focus:outline-none focus:border-[#5A5A40]"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleClearDiscount}
+                        className="px-2 py-1 bg-white hover:bg-[#F5F5F0] border border-[#E5E5DE] text-[10px] text-red-600 rounded-lg cursor-pointer font-medium"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    {/* Quick suggestion buttons */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[10px] text-[#8B7E66]">Quick:</span>
+                      {discountType === 'percentage'
+                        ? [7.5, 12, 25, 50].map((p) => (
+                            <button
+                              key={p}
+                              onClick={() => {
+                                setManualDiscountInput(p.toString());
+                                handleApplyManualDiscount('percentage', p);
+                              }}
+                              className="px-1.5 py-0.5 bg-white border border-[#E5E5DE] hover:border-[#5A5A40] rounded text-[10px] text-[#5A5A40] font-medium cursor-pointer"
+                            >
+                              {p}%
+                            </button>
+                          ))
+                        : [5, 10, 25, 50].map((amt) => (
+                            <button
+                              key={amt}
+                              onClick={() => {
+                                setManualDiscountInput(amt.toString());
+                                handleApplyManualDiscount('amount', amt);
+                              }}
+                              className="px-1.5 py-0.5 bg-white border border-[#E5E5DE] hover:border-[#5A5A40] rounded text-[10px] text-[#5A5A40] font-medium cursor-pointer"
+                            >
+                              ${amt}
+                            </button>
+                          ))}
+                    </div>
+
+                    {/* Discount Reason Tag */}
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Reason (e.g. Loyalty, Damaged Box, Staff)"
+                        value={discountReason}
+                        onChange={(e) => setDiscountReason(e.target.value)}
+                        className="w-full px-2 py-1 bg-white border border-[#E5E5DE] rounded-lg text-[11px] text-[#5A5A40] placeholder:text-[#8B7E66]/60 focus:outline-none focus:border-[#5A5A40]"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Cart Action Buttons: Hold, Invoice, Recall */}
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={handleParkOrder}
                     className="flex-1 py-1.5 rounded-xl border border-[#E5E5DE] bg-[#FAF9F5] hover:bg-[#F5F5F0] text-[11px] font-medium text-[#5A5A40] flex items-center justify-center gap-1 cursor-pointer"
+                    title="Park this cart to hold items temporarily"
                   >
-                    <PauseCircle className="w-3.5 h-3.5" /> Hold / Park Order
+                    <PauseCircle className="w-3.5 h-3.5" /> Hold
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenInvoiceModal()}
+                    className="flex-1 py-1.5 rounded-xl border border-[#5A5A40]/30 bg-[#FAF9F5] hover:bg-[#5A5A40]/10 text-[11px] font-semibold text-[#5A5A40] flex items-center justify-center gap-1 cursor-pointer"
+                    title="Generate formal single or multi-item invoice from cart"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Invoice
                   </button>
 
                   {parkedOrders.length > 0 && (
                     <button
                       onClick={() => handleRecallOrder(parkedOrders[0].id)}
-                      className="py-1.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-[11px] font-medium text-amber-800 flex items-center justify-center gap-1 cursor-pointer"
+                      className="py-1.5 px-2.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-[11px] font-medium text-amber-800 flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      <PlayCircle className="w-3.5 h-3.5" /> Recall ({parkedOrders.length})
+                      <PlayCircle className="w-3.5 h-3.5" /> ({parkedOrders.length})
                     </button>
                   )}
                 </div>
@@ -681,7 +903,19 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
               </div>
               {discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-700 font-medium">
-                  <span>Discount ({discountPercent}%):</span>
+                  <span className="flex items-center gap-1">
+                    <span>
+                      Discount ({discountType === 'percentage' ? `${discountValue}%` : `$${discountValue.toFixed(2)}`}
+                      {discountReason ? ` • ${discountReason}` : ''}):
+                    </span>
+                    <button
+                      onClick={handleClearDiscount}
+                      className="text-[11px] text-red-500 hover:text-red-700 ml-1 cursor-pointer font-bold"
+                      title="Clear discount"
+                    >
+                      ×
+                    </button>
+                  </span>
                   <span>-${discountAmount.toFixed(2)}</span>
                 </div>
               )}
@@ -1027,18 +1261,35 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 border-t border-[#E5E5DE] bg-white flex items-center justify-between gap-2">
-              <button
-                onClick={() => {
-                  onShowNotification?.('Printing', 'Receipt dispatched to thermal receipt printer.');
-                }}
-                className="flex-1 py-2 rounded-xl border border-[#E5E5DE] hover:bg-[#F5F5F0] text-xs font-semibold text-[#5A5A40] flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" /> Print Receipt
-              </button>
+            <div className="p-4 border-t border-[#E5E5DE] bg-white flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => {
+                    onShowNotification?.('Printing', 'Receipt dispatched to thermal receipt printer.');
+                  }}
+                  className="flex-1 py-2 rounded-xl border border-[#E5E5DE] hover:bg-[#F5F5F0] text-xs font-semibold text-[#5A5A40] flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print Receipt
+                </button>
+                <button
+                  onClick={() => {
+                    if (completedOrder) {
+                      setInvoiceInitialItems(completedOrder.items);
+                      setInvoiceCustomerPreset({
+                        name: completedOrder.customerName || 'Customer',
+                        poReference: completedOrder.orderNumber,
+                      });
+                      setIsInvoiceModalOpen(true);
+                    }
+                  }}
+                  className="flex-1 py-2 rounded-xl bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#5A5A40]/30 text-[#5A5A40] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Official Invoice
+                </button>
+              </div>
               <button
                 onClick={() => setCompletedOrder(null)}
-                className="flex-1 py-2 rounded-xl bg-[#5A5A40] hover:bg-[#474732] text-white text-xs font-bold cursor-pointer"
+                className="w-full py-2 rounded-xl bg-[#5A5A40] hover:bg-[#474732] text-white text-xs font-bold cursor-pointer transition-colors"
               >
                 New Sale
               </button>
@@ -1046,6 +1297,29 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* POS INVOICE GENERATOR MODAL */}
+      <PosInvoiceGeneratorModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        availableProducts={products}
+        initialItems={invoiceInitialItems}
+        customerPreset={invoiceCustomerPreset}
+        onLoadItemsToCart={(items) => {
+          setCart(items);
+          onShowNotification?.(
+            'Cart Synchronized',
+            `Loaded ${items.length} item(s) from invoice generator into active terminal cart.`
+          );
+        }}
+        onAddInvoiceToLedger={(invoice) => {
+          onAddInvoice?.(invoice);
+          onShowNotification?.(
+            'Invoice Logged',
+            `Official invoice ${invoice.invoiceNumber} recorded to finance accounts ledger ($${invoice.totalAmount.toFixed(2)}).`
+          );
+        }}
+      />
 
       {/* SHIFT & DRAWER MODAL */}
       {isShiftModalOpen && (

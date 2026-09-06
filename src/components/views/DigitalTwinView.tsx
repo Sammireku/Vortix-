@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Factory,
   Activity,
@@ -15,31 +15,196 @@ import {
   Radio,
   Sliders,
   Sparkles,
+  TrendingUp,
+  Pause,
+  Play,
+  ArrowUpRight,
+  ExternalLink,
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
-import { FloorCell, AgvVehicle, RoleDefinition } from '../../types';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine
+} from 'recharts';
+import { FloorCell, AgvVehicle, RoleDefinition, MaintenanceAsset } from '../../types';
+import { INITIAL_MAINTENANCE_ASSETS } from '../../data/initialData';
 
 interface DigitalTwinViewProps {
   cells: FloorCell[];
   agvFleet: AgvVehicle[];
   currentRole: RoleDefinition;
+  maintenanceAssets?: MaintenanceAsset[];
   onSelectCell?: (cell: FloorCell) => void;
   onDispatchAgv?: (agvId: string) => void;
   onEmergencyStopBay?: (bayName: string) => void;
+  onNavigateToIotAnalytics?: (assetId?: string) => void;
+}
+
+interface HistoricalTempPoint {
+  time: string;
+  timestamp: number;
+  temperature: number;
+  displayTemp: number;
+  warningLimit: number;
+  criticalLimit: number;
+  vibration: number;
+  status: 'normal' | 'warning' | 'critical';
 }
 
 export const DigitalTwinView: React.FC<DigitalTwinViewProps> = ({
   cells,
   agvFleet,
   currentRole,
+  maintenanceAssets = INITIAL_MAINTENANCE_ASSETS,
   onSelectCell,
   onDispatchAgv,
   onEmergencyStopBay,
+  onNavigateToIotAnalytics,
 }) => {
   const [selectedCellId, setSelectedCellId] = useState<string>(cells[0]?.id || '');
   const [activeBayFilter, setActiveBayFilter] = useState<string>('all');
-  const [telemetrySimTime, setTelemetrySimTime] = useState<string>('Real-Time (500ms)');
+  const [telemetrySimTime, setTelemetrySimTime] = useState<string>('Real-Time (1.8s)');
+
+  // Selected Maintenance Asset for Recharts Temperature Trend
+  const [selectedAssetId, setSelectedAssetId] = useState<string>(maintenanceAssets[0]?.id || 'asset-01');
+  const [isChartStreaming, setIsChartStreaming] = useState<boolean>(true);
+  const [chartTempUnit, setChartTempUnit] = useState<'C' | 'F'>('C');
 
   const selectedCell = cells.find((c) => c.id === selectedCellId) || cells[0];
+  const selectedAsset = useMemo(() => {
+    return maintenanceAssets.find((a) => a.id === selectedAssetId) || maintenanceAssets[0];
+  }, [maintenanceAssets, selectedAssetId]);
+
+  // Asset base parameters for temperature simulation
+  const assetBaseParams = useMemo(() => {
+    switch (selectedAsset.id) {
+      case 'asset-02':
+        return { baseTemp: 56.4, warnC: 65, critC: 75, warnF: 149, critF: 167 };
+      case 'asset-03':
+        return { baseTemp: 22.8, warnC: 28, critC: 34, warnF: 82.4, critF: 93.2 };
+      case 'asset-04':
+        return { baseTemp: 182.0, warnC: 198, critC: 215, warnF: 388.4, critF: 419 };
+      case 'asset-01':
+      default:
+        return { baseTemp: 44.2, warnC: 60, critC: 75, warnF: 140, critF: 167 };
+    }
+  }, [selectedAsset.id]);
+
+  // Generate initial historical temperature data points
+  const [tempHistory, setTempHistory] = useState<HistoricalTempPoint[]>(() => {
+    const points: HistoricalTempPoint[] = [];
+    const now = Date.now();
+    const count = 22;
+
+    for (let i = count - 1; i >= 0; i--) {
+      const ts = now - i * 60 * 1000;
+      const angle = (count - i) * 0.4;
+      const noise = Math.sin(angle) * 1.5 + (Math.random() * 0.6 - 0.3);
+      const tempC = Math.round((assetBaseParams.baseTemp + noise) * 10) / 10;
+      const isWarn = tempC >= assetBaseParams.warnC;
+
+      points.push({
+        time: new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        timestamp: ts,
+        temperature: tempC,
+        displayTemp: tempC,
+        warningLimit: assetBaseParams.warnC,
+        criticalLimit: assetBaseParams.critC,
+        vibration: Math.round((1.6 + Math.cos(angle) * 0.2) * 100) / 100,
+        status: isWarn ? 'warning' : 'normal'
+      });
+    }
+    return points;
+  });
+
+  // Whenever selected asset changes, reseed historical temperature data
+  useEffect(() => {
+    const points: HistoricalTempPoint[] = [];
+    const now = Date.now();
+    const count = 22;
+
+    for (let i = count - 1; i >= 0; i--) {
+      const ts = now - i * 60 * 1000;
+      const angle = (count - i) * 0.4;
+      const noise = Math.sin(angle) * 1.4 + (Math.random() * 0.6 - 0.3);
+      const tempC = Math.round((assetBaseParams.baseTemp + noise) * 10) / 10;
+      const isWarn = tempC >= assetBaseParams.warnC;
+
+      points.push({
+        time: new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        timestamp: ts,
+        temperature: tempC,
+        displayTemp: chartTempUnit === 'F' ? Math.round(((tempC * 9) / 5 + 32) * 10) / 10 : tempC,
+        warningLimit: chartTempUnit === 'F' ? assetBaseParams.warnF : assetBaseParams.warnC,
+        criticalLimit: chartTempUnit === 'F' ? assetBaseParams.critF : assetBaseParams.critC,
+        vibration: Math.round((1.6 + Math.cos(angle) * 0.2) * 100) / 100,
+        status: isWarn ? 'warning' : 'normal'
+      });
+    }
+    setTempHistory(points);
+  }, [selectedAsset.id, assetBaseParams, chartTempUnit]);
+
+  // Live streaming interval for Recharts Line Chart
+  useEffect(() => {
+    if (!isChartStreaming) return;
+
+    const interval = setInterval(() => {
+      setTempHistory((prev) => {
+        const last = prev[prev.length - 1];
+        if (!last) return prev;
+
+        const now = Date.now();
+        const timeStr = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const delta = (Math.random() - 0.48) * 0.8;
+        const newTempC = Math.round((last.temperature + delta) * 10) / 10;
+
+        const isWarn = newTempC >= assetBaseParams.warnC;
+        const isCrit = newTempC >= assetBaseParams.critC;
+
+        const newPoint: HistoricalTempPoint = {
+          time: timeStr,
+          timestamp: now,
+          temperature: newTempC,
+          displayTemp: chartTempUnit === 'F' ? Math.round(((newTempC * 9) / 5 + 32) * 10) / 10 : newTempC,
+          warningLimit: chartTempUnit === 'F' ? assetBaseParams.warnF : assetBaseParams.warnC,
+          criticalLimit: chartTempUnit === 'F' ? assetBaseParams.critF : assetBaseParams.critC,
+          vibration: Math.max(0.1, Math.round((last.vibration + (Math.random() - 0.5) * 0.1) * 100) / 100),
+          status: isCrit ? 'critical' : isWarn ? 'warning' : 'normal'
+        };
+
+        return [...prev.slice(-24), newPoint];
+      });
+    }, 1800);
+
+    return () => clearInterval(interval);
+  }, [isChartStreaming, assetBaseParams, chartTempUnit]);
+
+  // When clicking a floor cell, synchronize with the matching maintenance asset
+  const handleCellClick = (cell: FloorCell) => {
+    setSelectedCellId(cell.id);
+    if (onSelectCell) onSelectCell(cell);
+
+    // Map cell to maintenance asset
+    if (cell.id === 'cell-cnc-1' || cell.id === 'cell-cnc-2') {
+      setSelectedAssetId('asset-01');
+    } else if (cell.id === 'cell-press-1') {
+      setSelectedAssetId('asset-02');
+    } else if (cell.id === 'cell-smt-1') {
+      setSelectedAssetId('asset-03');
+    } else if (cell.id === 'cell-coat-1') {
+      setSelectedAssetId('asset-04');
+    }
+  };
 
   const bays = Array.from(new Set(cells.map((c) => c.bay)));
 
@@ -59,25 +224,19 @@ export const DigitalTwinView: React.FC<DigitalTwinViewProps> = ({
           text: 'Bottleneck',
           badgeClass: 'bg-red-100 text-red-800 border-red-300',
         };
-      case 'idle':
+      case 'maintenance':
         return {
           bg: 'bg-amber-500',
           ring: 'ring-amber-300',
-          text: 'Idle',
+          text: 'Maintenance',
           badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
         };
-      case 'maintenance':
-        return {
-          bg: 'bg-blue-500',
-          ring: 'ring-blue-300',
-          text: 'Maintenance',
-          badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
-        };
+      case 'idle':
       default:
         return {
           bg: 'bg-gray-400',
-          ring: 'ring-gray-300',
-          text: 'Offline',
+          ring: 'ring-gray-200',
+          text: 'Idle',
           badgeClass: 'bg-gray-100 text-gray-800 border-gray-300',
         };
     }
@@ -88,142 +247,109 @@ export const DigitalTwinView: React.FC<DigitalTwinViewProps> = ({
       ? cells
       : cells.filter((c) => c.bay === activeBayFilter);
 
-  const runningCount = cells.filter((c) => c.status === 'running').length;
-  const bottleneckCount = cells.filter((c) => c.status === 'bottleneck').length;
-  const avgOee = Math.round(
-    cells.reduce((acc, c) => acc + c.oee, 0) / (cells.length || 1)
-  );
+  // Stats for the chart
+  const currentTempDisplay = tempHistory[tempHistory.length - 1]?.displayTemp || 0;
+  const tempSeries = tempHistory.map((p) => p.displayTemp);
+  const minTemp = tempSeries.length ? Math.min(...tempSeries) : 0;
+  const maxTemp = tempSeries.length ? Math.max(...tempSeries) : 0;
+  const avgTemp = tempSeries.length
+    ? Math.round((tempSeries.reduce((a, b) => a + b, 0) / tempSeries.length) * 10) / 10
+    : 0;
+
+  const warnLimitDisplay = chartTempUnit === 'F' ? assetBaseParams.warnF : assetBaseParams.warnC;
+  const critLimitDisplay = chartTempUnit === 'F' ? assetBaseParams.critF : assetBaseParams.critC;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Top Banner */}
-      <div className="bg-white rounded-2xl p-5 border border-[#E5E5DE] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Top Controls & Status Bar */}
+      <div className="bg-white rounded-2xl p-5 border border-[#E5E5DE] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-md bg-[#F5F5F0] text-[#5A5A40] border border-[#E5E5DE] font-semibold">
-              Cyber-Physical Twin
+            <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-md bg-[#F5F5F0] text-[#5A5A40] border border-[#E5E5DE] font-semibold flex items-center gap-1.5">
+              <Radio className="w-3 h-3 text-[#5A5A40]" />
+              Spatial Cyber-Physical Architecture
             </span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span>
-              Live Telemetry Stream
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+              {telemetrySimTime}
             </span>
           </div>
           <h2 className="font-serif text-2xl font-bold text-[#2D2D24] tracking-tight">
-            Interactive 2D Plant Floor Digital Twin & Telemetry Grid
+            Shop-Floor 2D Plant Digital Twin
           </h2>
           <p className="text-xs text-[#787668]">
-            Spatial layout of manufacturing workcells, IoT edge sensor thresholds, and autonomous mobile robot (AGV) transit.
+            Interactive 2D spatial workcenter layout, autonomous AGV fleet tracking, and live thermal telemetry.
           </p>
         </div>
 
-        {/* Filter Controls */}
+        {/* Filter by Bay & Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
-            value={activeBayFilter}
-            onChange={(e) => setActiveBayFilter(e.target.value)}
-            className="text-xs bg-[#F5F5F0] border border-[#E5E5DE] rounded-xl px-3 py-2 text-[#2D2D24] font-medium focus:ring-1 focus:ring-[#5A5A40] outline-hidden cursor-pointer"
-          >
-            <option value="all">All Factory Bays ({cells.length} Cells)</option>
-            {bays.map((bay) => (
-              <option key={bay} value={bay}>
-                {bay}
-              </option>
-            ))}
-          </select>
-
-          {onEmergencyStopBay && (
+          <div className="flex items-center bg-[#F5F5F0] p-1 rounded-xl border border-[#E5E5DE] text-xs font-semibold">
             <button
-              onClick={() => onEmergencyStopBay(activeBayFilter === 'all' ? 'All Bays' : activeBayFilter)}
-              className="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+              onClick={() => setActiveBayFilter('all')}
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                activeBayFilter === 'all'
+                  ? 'bg-white text-[#2D2D24] shadow-xs'
+                  : 'text-[#787668] hover:text-[#2D2D24]'
+              }`}
             >
-              <AlertCircle className="w-4 h-4" />
-              <span>Throttle Bay</span>
+              All Bays ({cells.length})
+            </button>
+            {bays.map((bay) => (
+              <button
+                key={bay}
+                onClick={() => setActiveBayFilter(bay)}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  activeBayFilter === bay
+                    ? 'bg-white text-[#2D2D24] shadow-xs'
+                    : 'text-[#787668] hover:text-[#2D2D24]'
+                }`}
+              >
+                {bay}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick link to IoT Edge Analytics */}
+          {onNavigateToIotAnalytics && (
+            <button
+              onClick={() => onNavigateToIotAnalytics(selectedAsset.id)}
+              className="px-3.5 py-2 bg-[#5A5A40] hover:bg-[#474732] text-white text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>Full IoT Edge Analytics</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* KPI Top Stat Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-4 border border-[#E5E5DE] shadow-xs">
-          <div className="text-[11px] text-[#8B7E66] font-medium">Active Machine Cells</div>
-          <div className="text-2xl font-serif font-bold text-[#2D2D24] mt-1">
-            {runningCount} <span className="text-sm font-sans font-normal text-[#787668]">/ {cells.length} Online</span>
-          </div>
-          <div className="text-[11px] text-emerald-700 font-medium mt-1">
-            Overall Plant Availability: 92.4%
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-[#E5E5DE] shadow-xs">
-          <div className="text-[11px] text-[#8B7E66] font-medium">Fleetwide Average OEE</div>
-          <div className="text-2xl font-serif font-bold text-[#2D2D24] mt-1">
-            {avgOee}%
-          </div>
-          <div className="text-[11px] text-[#5A5A40] font-medium mt-1">
-            Target benchmark: &gt; 85.0%
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-[#E5E5DE] shadow-xs">
-          <div className="text-[11px] text-[#8B7E66] font-medium">Critical Bottleneck Cells</div>
-          <div className="text-2xl font-serif font-bold text-red-600 mt-1">
-            {bottleneckCount} Machines
-          </div>
-          <div className="text-[11px] text-red-600/80 font-medium mt-1">
-            High vibration detected on 300T Press
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 border border-[#E5E5DE] shadow-xs">
-          <div className="text-[11px] text-[#8B7E66] font-medium">Autonomous AGV Fleet</div>
-          <div className="text-2xl font-serif font-bold text-[#2D2D24] mt-1">
-            {agvFleet.filter((a) => a.status === 'in_transit').length} In Transit
-          </div>
-          <div className="text-[11px] text-[#787668] mt-1">
-            {agvFleet.length} Mobile robots active
-          </div>
-        </div>
-      </div>
-
-      {/* Main Layout: 2D Spatial Floor Plan + Right Detail Inspector */}
+      {/* Main Floor Layout & Deep Dive Split */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: 2D Factory Map Canvas */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5E5DE] shadow-xs p-5 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E5E5DE]">
-            <div className="flex items-center gap-2">
-              <Factory className="w-4 h-4 text-[#5A5A40]" />
-              <h3 className="font-serif font-bold text-base text-[#2D2D24]">
-                Factory Floor Layout - Plant 1 Chicago
-              </h3>
-            </div>
-            <div className="flex items-center gap-3 text-[10px] font-medium text-[#787668]">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Running
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span> Idle
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-500"></span> Bottleneck
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Maintenance
-              </span>
-            </div>
-          </div>
-
-          {/* Interactive 2D Visual Grid */}
-          <div className="bg-[#F5F5F0] rounded-xl p-4 border border-[#E5E5DE] min-h-[380px] relative overflow-hidden">
-            {/* Grid Floor Line Markings */}
-            <div className="absolute inset-0 opacity-15 pointer-events-none grid grid-cols-6 grid-rows-4 divide-x divide-y divide-[#8B7E66]">
-              {Array.from({ length: 24 }).map((_, i) => (
-                <div key={i}></div>
-              ))}
+        {/* Left 2 Cols: 2D Plant Floor Grid Canvas */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white rounded-2xl border border-[#E5E5DE] shadow-xs p-5 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#E5E5DE]">
+              <div className="flex items-center gap-2">
+                <Factory className="w-4 h-4 text-[#5A5A40]" />
+                <h3 className="font-serif font-bold text-base text-[#2D2D24]">
+                  Midwest Machining Center - 2D Facility Grid (Plant 1)
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-[#8B7E66]">
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Normal
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> Bottleneck
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Starved
+                </span>
+              </div>
             </div>
 
-            {/* Workcell Cards Grid */}
-            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">
+            {/* Plant Floor 2D Isometric-like Grid with machine cells */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 relative z-10">
               {filteredCells.map((cell) => {
                 const badge = getStatusBadge(cell.status);
                 const isSelected = cell.id === selectedCellId;
@@ -231,22 +357,19 @@ export const DigitalTwinView: React.FC<DigitalTwinViewProps> = ({
                 return (
                   <div
                     key={cell.id}
-                    onClick={() => {
-                      setSelectedCellId(cell.id);
-                      if (onSelectCell) onSelectCell(cell);
-                    }}
-                    className={`bg-white rounded-xl p-3.5 border transition-all cursor-pointer relative group ${
+                    onClick={() => handleCellClick(cell)}
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
                       isSelected
-                        ? 'border-[#5A5A40] shadow-md ring-2 ring-[#5A5A40]/30'
-                        : 'border-[#E5E5DE] hover:border-[#8B7E66] shadow-xs'
+                        ? 'bg-[#FAF9F5] border-[#5A5A40] ring-2 ring-[#5A5A40]/30 shadow-md'
+                        : 'bg-white hover:bg-[#F5F5F0]/50 border-[#E5E5DE]'
                     }`}
                   >
-                    {/* Top Status Header */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${badge.bg} ring-4 ${badge.ring}`}></span>
-                        <span className="font-mono text-[10px] font-bold text-[#5A5A40]">
-                          {cell.code}
+                    {/* Top machine badge & status */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${badge.bg}`}></span>
+                        <span className="font-mono text-[10px] font-bold text-[#8B7E66]">
+                          {cell.machineType}
                         </span>
                       </div>
                       <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${badge.badgeClass}`}>
@@ -443,6 +566,198 @@ export const DigitalTwinView: React.FC<DigitalTwinViewProps> = ({
               <span className="font-bold text-[#2D2D24]">{selectedCell.oee}%</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* DYNAMIC RECHARTS LIVE-UPDATING HISTORICAL TEMPERATURE TREND SECTION */}
+      <div className="bg-white rounded-2xl border border-[#E5E5DE] shadow-xs p-5 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-[#E5E5DE]">
+          <div>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#5A5A40]" />
+              <h3 className="font-serif font-bold text-base text-[#2D2D24]">
+                Historical Temperature Trends (Recharts Live Stream)
+              </h3>
+            </div>
+            <p className="text-xs text-[#787668]">
+              Dynamic live-updating temperature curve for selected maintenance asset with threshold boundary indicators.
+            </p>
+          </div>
+
+          {/* Controls: Play/Pause, Unit, and Asset Selector */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsChartStreaming(!isChartStreaming)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                isChartStreaming
+                  ? 'bg-white hover:bg-[#F5F5F0] text-[#2D2D24] border-[#E5E5DE]'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
+              }`}
+            >
+              {isChartStreaming ? (
+                <>
+                  <Pause className="w-3 h-3" />
+                  <span>Pause Stream</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  <span>Resume Stream</span>
+                </>
+              )}
+            </button>
+
+            {/* °C / °F Unit Toggle */}
+            <div className="flex items-center bg-[#F5F5F0] p-0.5 rounded-xl border border-[#E5E5DE] text-xs font-bold">
+              <button
+                onClick={() => setChartTempUnit('C')}
+                className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+                  chartTempUnit === 'C' ? 'bg-white text-[#2D2D24] shadow-xs' : 'text-[#787668]'
+                }`}
+              >
+                °C
+              </button>
+              <button
+                onClick={() => setChartTempUnit('F')}
+                className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+                  chartTempUnit === 'F' ? 'bg-white text-[#2D2D24] shadow-xs' : 'text-[#787668]'
+                }`}
+              >
+                °F
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Asset Selection Buttons */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs font-bold text-[#2D2D24] mr-1">Select Asset:</span>
+          {maintenanceAssets.map((asset) => {
+            const isSelected = asset.id === selectedAssetId;
+            return (
+              <button
+                key={asset.id}
+                onClick={() => setSelectedAssetId(asset.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-[#5A5A40] text-white border-[#5A5A40] shadow-xs font-bold'
+                    : 'bg-[#FAF9F5] hover:bg-[#F5F5F0] text-[#2D2D24] border-[#E5E5DE]'
+                }`}
+              >
+                <span>{asset.name}</span>
+                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                  isSelected ? 'bg-white/20 text-white' : 'bg-white text-[#5A5A40] border border-[#E5E5DE]'
+                }`}>
+                  {asset.code}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Telemetry Summary Stats Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#FAF9F5] p-3 rounded-xl border border-[#E5E5DE] text-xs">
+          <div>
+            <span className="text-[#8B7E66] block text-[10px]">CURRENT TEMPERATURE</span>
+            <div className="flex items-center gap-1.5 font-bold text-sm text-[#2D2D24] mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>{currentTempDisplay} °{chartTempUnit}</span>
+            </div>
+          </div>
+          <div>
+            <span className="text-[#8B7E66] block text-[10px]">MIN IN WINDOW</span>
+            <div className="font-bold text-sm text-[#2D2D24] mt-0.5">
+              {minTemp} °{chartTempUnit}
+            </div>
+          </div>
+          <div>
+            <span className="text-[#8B7E66] block text-[10px]">MAX IN WINDOW</span>
+            <div className="font-bold text-sm text-[#2D2D24] mt-0.5">
+              {maxTemp} °{chartTempUnit}
+            </div>
+          </div>
+          <div>
+            <span className="text-[#8B7E66] block text-[10px]">AVERAGE NOMINAL</span>
+            <div className="font-bold text-sm text-[#5A5A40] mt-0.5">
+              {avgTemp} °{chartTempUnit}
+            </div>
+          </div>
+        </div>
+
+        {/* Warning Banner if Temp Approaching Limit */}
+        {currentTempDisplay >= warnLimitDisplay && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Thermal Warning Threshold Exceeded:</strong> Current reading of {currentTempDisplay}°{chartTempUnit} exceeds normal operating window limit ({warnLimitDisplay}°{chartTempUnit}).
+              </span>
+            </div>
+            {onNavigateToIotAnalytics && (
+              <button
+                onClick={() => onNavigateToIotAnalytics(selectedAsset.id)}
+                className="text-[11px] font-bold underline hover:no-underline shrink-0 text-amber-900"
+              >
+                Inspect Telemetry Harmonics &rarr;
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* RECHARTS Dynamic Live-Updating Line Chart */}
+        <div className="h-72 w-full pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={tempHistory} margin={{ top: 15, right: 30, left: -5, bottom: 0 }}>
+              <defs>
+                <linearGradient id="twinTempGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#5A5A40" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#5A5A40" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E5DE" vertical={false} />
+              <XAxis dataKey="time" stroke="#787668" fontSize={10} tickLine={false} />
+              <YAxis
+                stroke="#787668"
+                fontSize={10}
+                tickLine={false}
+                axisLine={false}
+                unit={`°${chartTempUnit}`}
+                domain={['dataMin - 3', 'dataMax + 4']}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#E5E5DE',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                  fontSize: '11px'
+                }}
+                formatter={(val: any) => [`${val} °${chartTempUnit}`, 'Core Temp']}
+                labelStyle={{ fontWeight: 'bold', color: '#2D2D24' }}
+              />
+              <ReferenceLine
+                y={warnLimitDisplay}
+                stroke="#d97706"
+                strokeDasharray="4 4"
+                label={{ value: `Warning (${warnLimitDisplay}°)`, fill: '#d97706', fontSize: 10, position: 'insideTopRight' }}
+              />
+              <ReferenceLine
+                y={critLimitDisplay}
+                stroke="#dc2626"
+                strokeDasharray="4 4"
+                label={{ value: `Critical (${critLimitDisplay}°)`, fill: '#dc2626', fontSize: 10, position: 'insideTopRight' }}
+              />
+              <Area
+                type="monotone"
+                dataKey="displayTemp"
+                stroke="#5A5A40"
+                strokeWidth={2.5}
+                fillOpacity={1}
+                fill="url(#twinTempGrad)"
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

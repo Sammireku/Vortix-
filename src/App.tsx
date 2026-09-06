@@ -13,6 +13,7 @@ import { IntegrationsView } from './components/views/IntegrationsView';
 import { DigitalTravelerView } from './components/views/DigitalTravelerView';
 import { BomMrpView } from './components/views/BomMrpView';
 import { DigitalTwinView } from './components/views/DigitalTwinView';
+import { IoTEdgeAnalyticsView } from './components/views/IoTEdgeAnalyticsView';
 import { MaintenanceCmmsView } from './components/views/MaintenanceCmmsView';
 import { CustomDashboardBuilderView } from './components/views/CustomDashboardBuilderView';
 import { SubAccountsView } from './components/views/SubAccountsView';
@@ -34,6 +35,7 @@ import { ProductTourModal } from './components/modals/ProductTourModal';
 import { SubDashboardSetupWizardModal } from './components/modals/SubDashboardSetupWizardModal';
 import { AuthOnboardingModal } from './components/modals/AuthOnboardingModal';
 import { LoginPortalModal } from './components/modals/LoginPortalModal';
+import { BatchCsvUploadModal } from './components/modals/BatchCsvUploadModal';
 
 import {
   initialRoles,
@@ -243,6 +245,8 @@ export default function App() {
   const [isProductTourOpen, setIsProductTourOpen] = useState(false);
   const [isSubDashboardWizardOpen, setIsSubDashboardWizardOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isBatchCsvModalOpen, setIsBatchCsvModalOpen] = useState(false);
+  const [batchCsvDataType, setBatchCsvDataType] = useState<'inventory' | 'employee'>('inventory');
 
   // Collapsible Navigation & Mobile Drawer State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -322,6 +326,73 @@ export default function App() {
 
   const handleUpdateEmployeeStatus = (id: string, status: Employee['status']) => {
     setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+  };
+
+  const handleUploadInventoryBatch = (items: InventoryItem[], mode: 'append' | 'update') => {
+    setInventory((prev) => {
+      if (mode === 'append') {
+        return [...prev, ...items];
+      }
+      const map = new Map<string, InventoryItem>();
+      prev.forEach((item) => map.set(item.sku.toLowerCase(), item));
+      items.forEach((item) => {
+        const key = item.sku.toLowerCase();
+        const existing = map.get(key);
+        if (existing) {
+          map.set(key, { ...existing, ...item, id: existing.id });
+        } else {
+          map.set(key, item);
+        }
+      });
+      return Array.from(map.values());
+    });
+
+    // Also sync matching products in POS if any
+    setPosProducts((prev) =>
+      prev.map((prod) => {
+        const matched = items.find((i) => i.sku.toLowerCase() === prod.sku.toLowerCase());
+        if (matched) {
+          return {
+            ...prod,
+            stockQty: matched.quantityOnHand,
+            name: matched.name,
+          };
+        }
+        return prod;
+      })
+    );
+
+    showNotification(
+      'Inventory Batch Processed',
+      `Processed ${items.length} inventory records via CSV (${mode.toUpperCase()} mode).`
+    );
+  };
+
+  const handleUploadEmployeesBatch = (uploadedEmployees: Employee[], mode: 'append' | 'update') => {
+    setEmployees((prev) => {
+      if (mode === 'append') {
+        return [...prev, ...uploadedEmployees];
+      }
+      const map = new Map<string, Employee>();
+      prev.forEach((emp) => map.set(emp.employeeCode.toLowerCase(), emp));
+      uploadedEmployees.forEach((emp) => {
+        const key = emp.employeeCode.toLowerCase();
+        const existing =
+          map.get(key) ||
+          Array.from(map.values()).find((e) => e.email.toLowerCase() === emp.email.toLowerCase());
+        if (existing) {
+          map.set(existing.employeeCode.toLowerCase(), { ...existing, ...emp, id: existing.id });
+        } else {
+          map.set(key, emp);
+        }
+      });
+      return Array.from(map.values());
+    });
+
+    showNotification(
+      'Workforce Batch Processed',
+      `Processed ${uploadedEmployees.length} employee records via CSV (${mode.toUpperCase()} mode).`
+    );
   };
 
   const handleDispatchFleetMission = (mission: FleetMission) => {
@@ -967,7 +1038,21 @@ export default function App() {
               cells={floorCells}
               agvFleet={agvFleet}
               currentRole={currentRole}
+              maintenanceAssets={maintenanceAssets}
               onEmergencyStopBay={handleEmergencyStopBay}
+              onNavigateToIotAnalytics={(assetId) => {
+                setActiveView('iot_edge_analytics');
+              }}
+            />
+          )}
+
+          {activeView === 'iot_edge_analytics' && (
+            <IoTEdgeAnalyticsView
+              currentRole={currentRole}
+              maintenanceAssets={maintenanceAssets}
+              onCreateWorkOrder={handleCreateMaintenanceOrder}
+              onNavigateToMaintenance={() => setActiveView('maintenance')}
+              onNavigateToDigitalTwin={() => setActiveView('digital_twin')}
             />
           )}
 
@@ -1025,6 +1110,10 @@ export default function App() {
               onRestockItem={handleRestockItem}
               onTriggerReorderWorkflow={handleTriggerReorderWorkflow}
               onOpenAddItemModal={() => setIsAddInventoryOpen(true)}
+              onOpenBatchUploadModal={() => {
+                setBatchCsvDataType('inventory');
+                setIsBatchCsvModalOpen(true);
+              }}
             />
           )}
 
@@ -1124,6 +1213,10 @@ export default function App() {
               onAddEmployee={handleAddEmployee}
               onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
               onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+              onOpenBatchUploadModal={() => {
+                setBatchCsvDataType('employee');
+                setIsBatchCsvModalOpen(true);
+              }}
             />
           )}
 
@@ -1287,6 +1380,7 @@ export default function App() {
                 );
               }}
               onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+              onAddInvoice={(invoice) => setInvoices((prev) => [invoice, ...prev])}
             />
           )}
 
@@ -1496,6 +1590,16 @@ export default function App() {
             ...prev,
           ]);
         }}
+        onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+      />
+
+      {/* Robust Batch CSV Data Import System (Inventory, Employees) */}
+      <BatchCsvUploadModal
+        isOpen={isBatchCsvModalOpen}
+        onClose={() => setIsBatchCsvModalOpen(false)}
+        initialDataType={batchCsvDataType}
+        onUploadInventory={handleUploadInventoryBatch}
+        onUploadEmployees={handleUploadEmployeesBatch}
         onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
       />
 
