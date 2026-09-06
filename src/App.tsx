@@ -19,6 +19,10 @@ import { SubAccountsView } from './components/views/SubAccountsView';
 import { DatabaseHubView } from './components/views/DatabaseHubView';
 import { HumanResourcesView } from './components/views/HumanResourcesView';
 import { FleetManagementView } from './components/views/FleetManagementView';
+import { UserAccessControlView } from './components/views/UserAccessControlView';
+import { PosTerminalView } from './components/views/PosTerminalView';
+import { PropertyManagementView } from './components/views/PropertyManagementView';
+import { ChannelManagementView } from './components/views/ChannelManagementView';
 import { Footer } from './components/Footer';
 import { AiReportModal } from './components/modals/AiReportModal';
 import { CreateWorkOrderModal } from './components/modals/CreateWorkOrderModal';
@@ -29,6 +33,7 @@ import { BrandingSettingsModal } from './components/modals/BrandingSettingsModal
 import { ProductTourModal } from './components/modals/ProductTourModal';
 import { SubDashboardSetupWizardModal } from './components/modals/SubDashboardSetupWizardModal';
 import { AuthOnboardingModal } from './components/modals/AuthOnboardingModal';
+import { LoginPortalModal } from './components/modals/LoginPortalModal';
 
 import {
   initialRoles,
@@ -58,6 +63,15 @@ import { initialChartOfAccounts, initialJournalEntries } from './data/accounting
 import { initialAppConnectors } from './data/connectorsData';
 import { initialSubAccounts } from './data/subAccountsData';
 import { initialDatabases } from './data/databaseData';
+import {
+  initialAppUsers,
+  initialPosProducts,
+  initialPropertyUnits,
+  initialReservations,
+  initialChannels,
+  initialChannelSyncLogs,
+  initialSecurityAuditLogs,
+} from './data/authAndEnterpriseData';
 import {
   initialEmployees,
   initialAttendanceRecords,
@@ -103,6 +117,14 @@ import {
   FleetVehicle,
   FleetMission,
   CustomDashboard,
+  AppUser,
+  PosProduct,
+  PosOrder,
+  PropertyUnit,
+  PropertyReservation,
+  DistributionChannel,
+  ChannelSyncEvent,
+  SecurityAuditEntry,
 } from './types';
 import { CheckCircle2, AlertTriangle, Zap, X } from 'lucide-react';
 
@@ -111,6 +133,24 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState<RoleDefinition>(initialRoles[0]);
   const [activeFacility, setActiveFacility] = useState<Facility>(initialFacilities[0]);
   const [activeView, setActiveView] = useState<string>('custom_dashboards');
+
+  // Multi-Tenant Authentication & Sub-User RBAC State
+  const [allUsers, setAllUsers] = useState<AppUser[]>(initialAppUsers);
+  const [currentUser, setCurrentUser] = useState<AppUser>(initialAppUsers[0]);
+  const [userAuditLogs, setUserAuditLogs] = useState<SecurityAuditEntry[]>(initialSecurityAuditLogs);
+  const [isLoginPortalOpen, setIsLoginPortalOpen] = useState<boolean>(false);
+
+  // Point of Sale (POS) State
+  const [posProducts, setPosProducts] = useState<PosProduct[]>(initialPosProducts);
+  const [posCompletedOrders, setPosCompletedOrders] = useState<PosOrder[]>([]);
+
+  // Property & Residency Management (PMS) State
+  const [propertyUnits, setPropertyUnits] = useState<PropertyUnit[]>(initialPropertyUnits);
+  const [propertyReservations, setPropertyReservations] = useState<PropertyReservation[]>(initialReservations);
+
+  // OTA Channel Manager (CMS) State
+  const [distributionChannels, setDistributionChannels] = useState<DistributionChannel[]>(initialChannels);
+  const [channelSyncLogs, setChannelSyncLogs] = useState<ChannelSyncEvent[]>(initialChannelSyncLogs);
 
   // Manufacturing ERP State
   const [lines, setLines] = useState<ProductionLine[]>(initialLines);
@@ -203,6 +243,48 @@ export default function App() {
   const [isProductTourOpen, setIsProductTourOpen] = useState(false);
   const [isSubDashboardWizardOpen, setIsSubDashboardWizardOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Collapsible Navigation & Mobile Drawer State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('vortix_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar collapse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => {
+          const next = !prev;
+          try {
+            localStorage.setItem('vortix_sidebar_collapsed', String(next));
+          } catch {}
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleToggleSidebar = () => {
+    if (window.innerWidth < 768) {
+      setIsMobileSidebarOpen((prev) => !prev);
+    } else {
+      setIsSidebarCollapsed((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem('vortix_sidebar_collapsed', String(next));
+        } catch {}
+        return next;
+      });
+    }
+  };
 
   // Handlers for Branding, Profile, HR, Fleet
   const handleSaveBranding = (updated: CompanyBranding) => {
@@ -762,22 +844,49 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-[#F5F5F0] text-[#2D2D24] font-sans antialiased overflow-hidden">
-      {/* Sidebar Navigation with RBAC */}
+      {/* Mobile Drawer Overlay Backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-label="Close navigation overlay"
+        />
+      )}
+
+      {/* Sidebar Navigation with RBAC & Sub-User Constraints */}
       <Sidebar
         activeView={activeView}
-        onSelectView={setActiveView}
+        onSelectView={(view) => {
+          setActiveView(view);
+          setIsMobileSidebarOpen(false);
+        }}
         currentRole={currentRole}
+        currentUser={currentUser}
         openWorkOrdersCount={workOrders.filter((w) => w.status === 'in_progress').length}
         lowStockItemsCount={inventory.filter((i) => i.status === 'low_stock' || i.status === 'critical').length}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => {
+          setIsSidebarCollapsed((prev) => {
+            const next = !prev;
+            try {
+              localStorage.setItem('vortix_sidebar_collapsed', String(next));
+            } catch {}
+            return next;
+          });
+        }}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header Bar */}
+        {/* Header Bar with Active Sub-User Authentication */}
         <Header
           roles={initialRoles}
           currentRole={currentRole}
           onSelectRole={setCurrentRole}
+          currentUser={currentUser}
+          onOpenLoginPortal={() => setIsLoginPortalOpen(true)}
           facilities={initialFacilities}
           activeFacility={activeFacility}
           onSelectFacility={setActiveFacility}
@@ -788,10 +897,12 @@ export default function App() {
           onOpenBrandingModal={() => setIsBrandingModalOpen(true)}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenProductTour={() => setIsProductTourOpen(true)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={handleToggleSidebar}
         />
 
         {/* Dynamic Viewport */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-[#F5F5F0]">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 xl:p-8 space-y-6 bg-[#F5F5F0]">
           {activeView === 'custom_dashboards' && (
             <CustomDashboardBuilderView
               lines={lines}
@@ -1026,6 +1137,231 @@ export default function App() {
             />
           )}
 
+          {/* Sub-User Management & Module Access Control (RBAC) */}
+          {(activeView === 'user_access_control' || activeView === 'rbac') && (
+            <UserAccessControlView
+              currentUser={currentUser}
+              allUsers={allUsers}
+              onUpdateUser={(updated) => {
+                setAllUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+                if (currentUser.id === updated.id) {
+                  setCurrentUser(updated);
+                }
+              }}
+              onAddUser={(newUser) => {
+                setAllUsers((prev) => [newUser, ...prev]);
+                setUserAuditLogs((prev) => [
+                  {
+                    id: `aud-${Date.now()}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userRole: currentUser.role,
+                    action: 'CREATE_SUB_USER',
+                    module: 'user_access_control',
+                    resourceDetails: `Provisioned sub-user account ${newUser.fullName} with [${newUser.role}] role.`,
+                    ipAddress: '192.168.1.100 (Console)',
+                    timestamp: 'Just now',
+                    status: 'allowed',
+                  },
+                  ...prev,
+                ]);
+              }}
+              onCreateSubUser={(newUser) => {
+                setAllUsers((prev) => [newUser, ...prev]);
+                setUserAuditLogs((prev) => [
+                  {
+                    id: `aud-${Date.now()}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userRole: currentUser.role,
+                    action: 'CREATE_SUB_USER',
+                    module: 'user_access_control',
+                    resourceDetails: `Provisioned sub-user account ${newUser.fullName} with [${newUser.role}] role.`,
+                    ipAddress: '192.168.1.100 (Console)',
+                    timestamp: 'Just now',
+                    status: 'allowed',
+                  },
+                  ...prev,
+                ]);
+              }}
+              onSwitchUser={(user) => {
+                setCurrentUser(user);
+                const matchedRole = initialRoles.find((r) => r.id === user.role) || initialRoles[0];
+                setCurrentRole(matchedRole);
+                showNotification('User Switched', `Active session switched to ${user.fullName} (${user.roleTitle}).`);
+              }}
+              onDeleteUser={(userId) => {
+                const target = allUsers.find((u) => u.id === userId);
+                setAllUsers((prev) => prev.filter((u) => u.id !== userId));
+                if (target) {
+                  setUserAuditLogs((prev) => [
+                    {
+                      id: `aud-${Date.now()}`,
+                      userId: currentUser.id,
+                      userName: currentUser.fullName,
+                      userRole: currentUser.role,
+                      action: 'REVOKE_USER',
+                      module: 'user_access_control',
+                      resourceDetails: `Revoked access credentials for sub-user ${target.fullName}.`,
+                      ipAddress: '192.168.1.100 (Console)',
+                      timestamp: 'Just now',
+                      status: 'allowed',
+                    },
+                    ...prev,
+                  ]);
+                }
+              }}
+              auditLogs={userAuditLogs}
+              onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+            />
+          )}
+
+          {/* Point of Sale (POS) Terminal & Register */}
+          {activeView === 'pos_terminal' && (
+            <PosTerminalView
+              currentUser={currentUser}
+              products={posProducts}
+              onUpdateProduct={(updated) => {
+                setPosProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+              }}
+              activeReservations={propertyReservations.filter((r) => r.status === 'checked_in')}
+              onProcessOrder={(newOrder) => {
+                setPosCompletedOrders((prev) => [newOrder, ...prev]);
+
+                // Deduct inventory quantities
+                newOrder.items.forEach((item) => {
+                  setPosProducts((prev) =>
+                    prev.map((p) =>
+                      p.id === item.product.id
+                        ? { ...p, stockQty: Math.max(0, p.stockQty - item.quantity) }
+                        : p
+                    )
+                  );
+                });
+
+                // If billed to in-house guest room folio, automatically post the charge!
+                if (newOrder.billedToReservationId) {
+                  setPropertyReservations((prev) =>
+                    prev.map((r) =>
+                      r.id === newOrder.billedToReservationId
+                        ? {
+                            ...r,
+                            folioCharges: [
+                              ...(r.folioCharges || []),
+                              {
+                                id: `chg-${Date.now()}`,
+                                description: `POS Purchase: ${newOrder.items.map((i) => `${i.quantity}x ${i.product.name}`).join(', ')}`,
+                                amount: newOrder.total,
+                                date: new Date().toISOString().split('T')[0],
+                                category: 'pos_charge',
+                              },
+                            ],
+                          }
+                        : r
+                    )
+                  );
+                }
+
+                // Log audit action
+                setUserAuditLogs((prev) => [
+                  {
+                    id: `aud-${Date.now()}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userRole: currentUser.role,
+                    action: 'POS_CHECKOUT',
+                    module: 'pos_terminal',
+                    resourceDetails: `Finalized $${newOrder.total.toFixed(2)} via ${newOrder.paymentMethod.toUpperCase()}${
+                      newOrder.guestFolioRoomNumber ? ` (Billed to Room ${newOrder.guestFolioRoomNumber})` : ''
+                    }.`,
+                    ipAddress: '192.168.2.15 (Terminal #01)',
+                    timestamp: 'Just now',
+                    status: 'allowed',
+                  },
+                  ...prev,
+                ]);
+
+                showNotification(
+                  'Order Processed',
+                  `Order #${newOrder.orderNumber} ($${newOrder.total.toFixed(2)}) finalized by ${currentUser.fullName}.`
+                );
+              }}
+              onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+            />
+          )}
+
+          {/* Property Management System (PMS) */}
+          {activeView === 'property_management' && (
+            <PropertyManagementView
+              currentUser={currentUser}
+              units={propertyUnits}
+              onUpdateUnit={(updated) => {
+                setPropertyUnits((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+              }}
+              reservations={propertyReservations}
+              onAddReservation={(newRes) => {
+                setPropertyReservations((prev) => [newRes, ...prev]);
+                setPropertyUnits((prev) =>
+                  prev.map((u) =>
+                    u.id === newRes.unitId
+                      ? { ...u, occupancyStatus: 'reserved' }
+                      : u
+                  )
+                );
+                setUserAuditLogs((prev) => [
+                  {
+                    id: `aud-${Date.now()}`,
+                    userId: currentUser.id,
+                    userName: currentUser.fullName,
+                    userRole: currentUser.role,
+                    action: 'CREATE_RESERVATION',
+                    module: 'property_management',
+                    resourceDetails: `Booked ${newRes.guestName} into ${newRes.unitNumber} (${newRes.channelOrigin.toUpperCase()}).`,
+                    ipAddress: '10.0.4.12 (Hospitality Hub)',
+                    timestamp: 'Just now',
+                    status: 'allowed',
+                  },
+                  ...prev,
+                ]);
+              }}
+              onUpdateReservation={(updatedRes) => {
+                setPropertyReservations((prev) =>
+                  prev.map((r) => (r.id === updatedRes.id ? updatedRes : r))
+                );
+              }}
+              onNavigateToChannels={() => setActiveView('channel_management')}
+              onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+            />
+          )}
+
+          {/* OTA Channel Management (CMS) */}
+          {activeView === 'channel_management' && (
+            <ChannelManagementView
+              currentUser={currentUser}
+              channels={distributionChannels}
+              onUpdateChannel={(updated) => {
+                setDistributionChannels((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+              }}
+              units={propertyUnits}
+              reservations={propertyReservations}
+              onAddReservation={(newRes) => {
+                setPropertyReservations((prev) => [newRes, ...prev]);
+                setPropertyUnits((prev) =>
+                  prev.map((u) =>
+                    u.id === newRes.unitId
+                      ? { ...u, occupancyStatus: 'reserved' }
+                      : u
+                  )
+                );
+              }}
+              syncLogs={channelSyncLogs}
+              onAddSyncLog={(newLog) => {
+                setChannelSyncLogs((prev) => [newLog, ...prev]);
+              }}
+              onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
+            />
+          )}
+
           {/* Platform Footer with Powered by; Vortix Badge */}
           {branding.showPoweredByVortix && (
             <Footer
@@ -1130,6 +1466,37 @@ export default function App() {
         userProfile={userProfile}
         onSaveProfile={handleSaveProfile}
         onStartTour={() => setIsProductTourOpen(true)}
+      />
+
+      {/* Login Portal & Sub-User Persona Switcher Modal */}
+      <LoginPortalModal
+        isOpen={isLoginPortalOpen}
+        onClose={() => setIsLoginPortalOpen(false)}
+        currentUser={currentUser}
+        allUsers={allUsers}
+        onSelectUser={(selectedUser) => {
+          setCurrentUser(selectedUser);
+          const matchingRole = initialRoles.find((r) => r.id === selectedUser.role);
+          if (matchingRole) {
+            setCurrentRole(matchingRole);
+          }
+          setUserAuditLogs((prev) => [
+            {
+              id: `aud-${Date.now()}`,
+              userId: selectedUser.id,
+              userName: selectedUser.fullName,
+              userRole: selectedUser.role,
+              action: 'AUTHENTICATE',
+              module: 'user_access_control',
+              resourceDetails: `Active session authenticated for ${selectedUser.fullName} (${selectedUser.roleTitle}).`,
+              ipAddress: '192.168.1.100 (Console)',
+              timestamp: 'Just now',
+              status: 'allowed',
+            },
+            ...prev,
+          ]);
+        }}
+        onShowNotification={(title, message, type) => showNotification(title, message, type || 'success')}
       />
 
       {/* Notification Toast */}

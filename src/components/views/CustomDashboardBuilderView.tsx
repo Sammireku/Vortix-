@@ -1505,7 +1505,7 @@ export const CustomDashboardBuilderView: React.FC<CustomDashboardBuilderViewProp
                           ? 'span 1 / span 1'
                           : breakpointView === 'tablet'
                           ? `span ${Math.min(widget.colSpan || 1, 2)} / span ${Math.min(widget.colSpan || 1, 2)}`
-                          : undefined,
+                          : `span ${Math.min(widget.colSpan || 1, 4)} / span ${Math.min(widget.colSpan || 1, 4)}`,
                     }}
                   >
                     {/* Freeform Coordinates Badge */}

@@ -22,6 +22,10 @@ export interface RoleDefinition {
     workflows: 'admin' | 'write' | 'read' | 'none';
     integrations: 'admin' | 'write' | 'read' | 'none';
     reports: 'admin' | 'write' | 'read' | 'none';
+    pos_terminal?: 'admin' | 'write' | 'read' | 'none';
+    property_management?: 'admin' | 'write' | 'read' | 'none';
+    channel_management?: 'admin' | 'write' | 'read' | 'none';
+    user_access_control?: 'admin' | 'write' | 'read' | 'none';
   };
 }
 
@@ -36,6 +40,10 @@ export type ViewTab =
   | 'fleet_management'
   | 'supply_chain'
   | 'inventory'
+  | 'pos_terminal'
+  | 'property_management'
+  | 'channel_management'
+  | 'user_access_control'
   | 'bom_mrp'
   | 'maintenance'
   | 'human_resources'
@@ -979,3 +987,257 @@ export interface FleetInspection {
 // Aliases for dashboard builder configs
 export type CustomDashboardConfig = CustomDashboard;
 export type CustomWidgetInstance = DashboardWidget;
+
+// =============================================================
+// SUB-USERS, AUTHENTICATION & ACCESS CONTROL TYPES
+// =============================================================
+
+export type AccessLevel = 'admin' | 'write' | 'read' | 'none';
+
+export interface ModulePermissionMap {
+  dashboard: AccessLevel;
+  custom_dashboards: AccessLevel;
+  production: AccessLevel;
+  digital_traveler: AccessLevel;
+  digital_twin: AccessLevel;
+  fleet_management: AccessLevel;
+  supply_chain: AccessLevel;
+  inventory: AccessLevel;
+  pos_terminal: AccessLevel;
+  property_management: AccessLevel;
+  channel_management: AccessLevel;
+  bom_mrp: AccessLevel;
+  maintenance: AccessLevel;
+  human_resources: AccessLevel;
+  projects: AccessLevel;
+  crm_marketing: AccessLevel;
+  finance: AccessLevel;
+  workflows: AccessLevel;
+  integrations: AccessLevel;
+  sub_accounts: AccessLevel;
+  database_hub: AccessLevel;
+  user_access_control: AccessLevel;
+}
+
+export interface DataAccessRules {
+  canViewFinancialMetrics: boolean;
+  canViewCustomerPii: boolean;
+  canExportReports: boolean;
+  canOverrideDiscounts: boolean;
+  canManageSubUsers: boolean;
+  canExecuteRefunds: boolean;
+  canModifyChannelRates: boolean;
+  canSignOffTravelers: boolean;
+  canApprovePurchaseOrders: boolean;
+}
+
+export interface AppUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: 'super_admin' | 'plant_manager' | 'department_supervisor' | 'pos_cashier' | 'property_host' | 'operator' | 'auditor';
+  roleTitle: string;
+  department: string;
+  avatarUrl?: string;
+  status: 'active' | 'suspended' | 'pending';
+  facilityId: string;
+  facilityName: string;
+  isSubUser: boolean;
+  parentUserId?: string;
+  pinCode?: string; // 4-digit PIN for rapid terminal switch
+  lastLoginAt: string;
+  createdAt: string;
+  permissions: ModulePermissionMap;
+  dataAccess: DataAccessRules;
+}
+
+export interface SecurityAuditEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  module: string;
+  resourceDetails: string;
+  ipAddress: string;
+  timestamp: string;
+  status: 'allowed' | 'restricted' | 'warning';
+}
+
+// =============================================================
+// POINT OF SALE (POS) SYSTEM TYPES
+// =============================================================
+
+export interface PosProduct {
+  id: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  category: 'Industrial Components' | 'Fasteners & Hardware' | 'Safety & PPE' | 'Hospitality & Retail' | 'Services & Labor' | 'Replacement Spares';
+  price: number;
+  cost: number;
+  stockQty: number;
+  taxRate: number; // e.g. 0.0825 (8.25%)
+  unit: string;
+  imageUrl?: string;
+  description?: string;
+}
+
+export interface PosCartItem {
+  id: string;
+  product: PosProduct;
+  quantity: number;
+  unitPrice: number;
+  discountPct: number;
+  notes?: string;
+}
+
+export type PosPaymentMethod = 'credit_card' | 'cash' | 'corporate_po' | 'room_folio_charge' | 'split';
+
+export interface PosOrder {
+  id: string;
+  orderNumber: string;
+  receiptNumber: string;
+  items: PosCartItem[];
+  subtotal: number;
+  taxTotal: number;
+  discountTotal: number;
+  grandTotal: number;
+  paymentMethod: PosPaymentMethod;
+  paymentStatus: 'completed' | 'pending' | 'refunded';
+  cashierId: string;
+  cashierName: string;
+  customerName?: string;
+  customerEmail?: string;
+  roomChargeDetails?: {
+    reservationId: string;
+    unitNumber: string;
+    guestName: string;
+  };
+  timestamp: string;
+  amountTendered?: number;
+  changeDue?: number;
+}
+
+export interface PosRegisterShift {
+  id: string;
+  registerNumber: string;
+  cashierId: string;
+  cashierName: string;
+  openedAt: string;
+  closedAt?: string;
+  openingCash: number;
+  currentCash: number;
+  expectedCash: number;
+  totalCardSales: number;
+  totalCashSales: number;
+  totalRoomCharges: number;
+  status: 'open' | 'closed';
+}
+
+// =============================================================
+// PROPERTY MANAGEMENT SYSTEM (PMS) TYPES
+// =============================================================
+
+export interface PropertyUnit {
+  id: string;
+  propertyName: string;
+  unitNumber: string;
+  unitType: 'Executive Suite' | 'Loft Suite' | 'Industrial Pod' | 'Conference Villa' | 'Studio Residence';
+  floor: number;
+  maxGuests: number;
+  baseRate: number;
+  cleaningStatus: 'clean' | 'dirty' | 'inspecting' | 'maintenance';
+  occupancyStatus: 'vacant' | 'occupied' | 'reserved' | 'blocked';
+  amenities: string[];
+  assignedHousekeeper?: string;
+  currentGuestName?: string;
+  currentReservationId?: string;
+  nextCheckIn?: string;
+  notes?: string;
+}
+
+export interface PropertyReservation {
+  id: string;
+  reservationCode: string;
+  unitId: string;
+  unitNumber: string;
+  propertyName: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  guestCount: number;
+  checkInDate: string;
+  checkOutDate: string;
+  totalNights: number;
+  nightlyRate: number;
+  totalAmount: number;
+  paymentStatus: 'paid' | 'deposit_paid' | 'pending' | 'folio_open';
+  channelOrigin: 'direct' | 'airbnb' | 'booking_com' | 'vrbo' | 'corporate_po';
+  status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
+  specialRequests?: string;
+  folioCharges?: Array<{
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+    category: 'room' | 'pos_charge' | 'service' | 'damage_deposit';
+  }>;
+}
+
+// =============================================================
+// CHANNEL MANAGEMENT SYSTEM (CMS) TYPES
+// =============================================================
+
+export interface DistributionChannel {
+  id: string;
+  name: string;
+  code: 'airbnb' | 'booking_com' | 'vrbo' | 'expedia' | 'direct' | 'corporate';
+  status: 'active' | 'syncing' | 'paused' | 'error';
+  syncHealthPct: number;
+  lastSyncedAt: string;
+  activeListingsCount: number;
+  commissionPct: number;
+  rateMarkupPct: number; // e.g. +10% markup pushed to this channel
+  autoSyncInventory: boolean;
+  apiKeyMasked: string;
+}
+
+export interface ChannelSyncEvent {
+  id: string;
+  channelName: string;
+  eventType: 'reservation_import' | 'rate_push' | 'availability_block' | 'cancellation_sync' | 'calendar_handshake';
+  details: string;
+  timestamp: string;
+  status: 'success' | 'warning' | 'failed';
+}
+
+export interface UnitIcalConnection {
+  unitId: string;
+  unitNumber: string;
+  propertyName: string;
+  exportUrl: string;
+  exportToken: string;
+  inboundFeeds: Array<{
+    id: string;
+    channelCode: 'airbnb' | 'booking_com' | 'vrbo' | 'other';
+    channelName: string;
+    feedUrl: string;
+    lastSyncedAt?: string;
+    syncStatus: 'active' | 'syncing' | 'error' | 'idle';
+    eventsImportedCount: number;
+    errorDetails?: string;
+  }>;
+}
+
+export interface IcalParsedEvent {
+  uid: string;
+  summary: string;
+  startDate: string;
+  endDate: string;
+  channel: string;
+  unitNumber: string;
+  description?: string;
+}
+
+

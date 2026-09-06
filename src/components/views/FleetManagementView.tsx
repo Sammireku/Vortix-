@@ -201,10 +201,10 @@ export const FleetManagementView: React.FC<FleetManagementViewProps> = ({
       {/* Main Tab Controls & Floor Navigation */}
       <div className="bg-white border border-[#E5E5DE] rounded-3xl shadow-sm overflow-hidden">
         <div className="p-4 border-b border-[#E5E5DE] flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#FAF9F5]">
-          <div className="flex items-center gap-1 bg-[#F5F5F0] p-1 rounded-2xl border border-[#E5E5DE]">
+          <div className="flex items-center gap-1 bg-[#F5F5F0] p-1 rounded-2xl border border-[#E5E5DE] overflow-x-auto max-w-full pb-1">
             <button
               onClick={() => setActiveTab('radar')}
-              className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'radar' ? 'bg-white text-[#2D2D24] shadow-2xs' : 'text-[#787668] hover:text-[#2D2D24]'
               }`}
             >
@@ -212,7 +212,7 @@ export const FleetManagementView: React.FC<FleetManagementViewProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('vehicles')}
-              className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'vehicles' ? 'bg-white text-[#2D2D24] shadow-2xs' : 'text-[#787668] hover:text-[#2D2D24]'
               }`}
             >
@@ -220,7 +220,7 @@ export const FleetManagementView: React.FC<FleetManagementViewProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('missions')}
-              className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'missions' ? 'bg-white text-[#2D2D24] shadow-2xs' : 'text-[#787668] hover:text-[#2D2D24]'
               }`}
             >
