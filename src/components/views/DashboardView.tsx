@@ -14,12 +14,18 @@ import {
   Cpu,
   Boxes,
   Zap,
+  Wrench,
+  Radio,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 import {
   ProductionLine,
   WorkOrder,
   Shipment,
   InventoryItem,
+  OperationalAlert,
+  FinanceMetric,
   RoleDefinition,
   ViewTab,
 } from '../../types';
@@ -29,11 +35,16 @@ interface DashboardViewProps {
   workOrders: WorkOrder[];
   shipments: Shipment[];
   inventory: InventoryItem[];
+  alerts?: OperationalAlert[];
+  finance?: FinanceMetric;
   currentRole: RoleDefinition;
   onNavigate: (tab: ViewTab) => void;
-  onOpenNewWorkOrder: () => void;
-  onLaunchAiReport: () => void;
-  onTriggerSimulatedAlert: () => void;
+  onOpenAiReport?: () => void;
+  onOpenNewWorkOrder?: () => void;
+  onLaunchAiReport?: () => void;
+  onTriggerSimulatedAlert?: () => void;
+  onTriggerPredictiveAlert?: () => void;
+  onAcknowledgeAlert?: (alertId: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -41,11 +52,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   workOrders,
   shipments,
   inventory,
+  alerts = [],
+  finance,
   currentRole,
   onNavigate,
+  onOpenAiReport,
   onOpenNewWorkOrder,
   onLaunchAiReport,
   onTriggerSimulatedAlert,
+  onTriggerPredictiveAlert,
+  onAcknowledgeAlert,
 }) => {
   // Aggregate Metrics
   const avgOee = (
@@ -422,77 +438,168 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Live Operational Alerts & Low-Code Automations (1 col) matching Design HTML */}
+        {/* Live Operational Alerts & Predictive Maintenance Hub */}
         <div className="bg-white border border-[#E5E5DE] rounded-3xl p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-serif italic text-[#5A5A40] font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-[#8B7E66]" />
-                Live Floor &amp; Supply Alerts
+                Live Floor &amp; Predictive Alerts
               </h2>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#F5F5F0] text-[#8B7E66] px-2 py-0.5 rounded-full border border-[#E5E5DE]">
-                Live Bus
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  AI Telemetry Active
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {/* Alert 1: Low stock matching Design HTML card */}
-              <div className="p-3.5 rounded-2xl bg-[#F9F9F7] border-l-4 border-[#8B7E66] shadow-xs text-xs">
-                <div className="flex items-center justify-between text-[#5A5A40] font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <Boxes className="w-3.5 h-3.5 text-[#8B7E66]" />
-                    Inventory Low Stock Breach
-                  </span>
-                  <span className="text-[10px] text-[#A09E8E]">3m ago</span>
-                </div>
-                <p className="text-[#2D2D24] text-[11px] mt-1">
-                  STM32 ARM Microcontrollers at 620 units (Minimum safety threshold: 1,000 units).
-                </p>
-                <div className="mt-2 flex items-center gap-2 text-[10px]">
-                  <span className="text-[#8B7E66]">Triggered:</span>
-                  <span className="text-[#5A5A40] font-medium">Workflow wf-01 (Auto-PO created)</span>
-                </div>
+            {/* Quick Trigger Bar for Predictive Maintenance */}
+            <div className="mb-3 p-2.5 bg-[#F5F5F0] border border-[#E5E5DE] rounded-2xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs text-[#5A5A40]">
+                <Radio className="w-3.5 h-3.5 text-[#8B7E66] animate-pulse" />
+                <span className="font-medium text-[11px]">Predictive Diagnostics</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                {onTriggerPredictiveAlert && (
+                  <button
+                    onClick={onTriggerPredictiveAlert}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold bg-[#5A5A40] hover:bg-[#484833] text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    title="Simulate bearing anomaly & auto-generate preventive work order"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Simulate Anomaly
+                  </button>
+                )}
+                {onTriggerSimulatedAlert && (
+                  <button
+                    onClick={onTriggerSimulatedAlert}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold bg-white hover:bg-[#E9E9E0] text-[#5A5A40] border border-[#E5E5DE] px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Sensor Spike
+                  </button>
+                )}
+              </div>
+            </div>
 
-              {/* Alert 2: Freight Customs Hold */}
-              <div className="p-3.5 rounded-2xl bg-[#F9F9F7] border-l-4 border-[#B85D36] shadow-xs text-xs">
-                <div className="flex items-center justify-between text-[#B85D36] font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-[#B85D36]" />
-                    Customs Hold: Air Cargo DHL
-                  </span>
-                  <span className="text-[10px] text-[#A09E8E]">14m ago</span>
+            {/* Dynamic Alert Feed */}
+            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+              {alerts.length === 0 ? (
+                <div className="p-4 rounded-2xl bg-[#F9F9F7] border border-[#E5E5DE] text-center">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
+                  <p className="text-xs font-semibold text-[#5A5A40]">All Floor Telemetry Nominal</p>
+                  <p className="text-[11px] text-[#A09E8E] mt-0.5">Zero sensor threshold breaches or mechanical alarms.</p>
                 </div>
-                <p className="text-[#2D2D24] text-[11px] mt-1">
-                  Shipment DHL-EX-993041 (Semiconductors) held at Chicago O’Hare for paperwork verification.
-                </p>
-                <div className="mt-2 text-[10px] text-[#8B7E66]">
-                  Buffer impact: SMT Line 3 schedule buffered +24h.
-                </div>
-              </div>
+              ) : (
+                alerts.map((alert) => {
+                  const isPredictive = alert.type === 'predictive_maintenance';
+                  const isCritical = alert.severity === 'critical';
+                  const isWarning = alert.severity === 'warning';
 
-              {/* Alert 3: Line Bottleneck */}
-              <div className="p-3.5 rounded-2xl bg-[#F9F9F7] border-l-4 border-[#5A5A40] shadow-xs text-xs">
-                <div className="flex items-center justify-between text-[#5A5A40] font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-[#5A5A40]" />
-                    SMT Line 3 Feeder Restored
-                  </span>
-                  <span className="text-[10px] text-[#A09E8E]">42m ago</span>
-                </div>
-                <p className="text-[#787668] text-[11px] mt-1">
-                  Tape feeder clear. Line operating at 92.5% performance rating.
-                </p>
-              </div>
+                  return (
+                    <div
+                      key={alert.id}
+                      className={`p-3.5 rounded-2xl shadow-xs text-xs border-l-4 transition-all ${
+                        isPredictive
+                          ? 'bg-amber-50/50 border-amber-500 border-t border-r border-b border-[#E5E5DE]'
+                          : isCritical
+                          ? 'bg-[#F9F9F7] border-[#B85D36]'
+                          : isWarning
+                          ? 'bg-[#F9F9F7] border-[#8B7E66]'
+                          : 'bg-[#F9F9F7] border-[#5A5A40]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1.5 text-[#2D2D24]">
+                          {isPredictive ? (
+                            <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                          ) : alert.lineOrPart?.toLowerCase().includes('cargo') || alert.title.toLowerCase().includes('cargo') ? (
+                            <Truck className="w-3.5 h-3.5 text-[#B85D36]" />
+                          ) : alert.lineOrPart?.toLowerCase().includes('stock') || alert.title.toLowerCase().includes('stock') ? (
+                            <Boxes className="w-3.5 h-3.5 text-[#8B7E66]" />
+                          ) : (
+                            <Cpu className="w-3.5 h-3.5 text-[#5A5A40]" />
+                          )}
+                          {alert.title}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isPredictive && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                              Predictive
+                            </span>
+                          )}
+                          <span className="text-[10px] text-[#A09E8E]">{alert.timestamp}</span>
+                        </div>
+                      </div>
+
+                      <p className="text-[#2D2D24] text-[11px] mt-1 leading-relaxed">
+                        {alert.description}
+                      </p>
+
+                      {/* Diagnostic badges if available */}
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                        {alert.healthScore !== undefined && (
+                          <span className="px-2 py-0.5 rounded-md bg-white border border-[#E5E5DE] text-[#5A5A40] font-medium">
+                            Health Score: <strong className={alert.healthScore < 70 ? 'text-amber-600' : 'text-emerald-600'}>{alert.healthScore}%</strong>
+                          </span>
+                        )}
+                        {alert.source && (
+                          <span className="px-2 py-0.5 rounded-md bg-white border border-[#E5E5DE] text-[#8B7E66]">
+                            Source: {alert.source}
+                          </span>
+                        )}
+                        {alert.actionTaken && (
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">
+                            Status: {alert.actionTaken}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="mt-2.5 pt-2 border-t border-[#E5E5DE]/60 flex items-center justify-between gap-2">
+                        {isPredictive ? (
+                          <button
+                            onClick={() => onNavigate('maintenance')}
+                            className="text-[10px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Wrench className="w-3 h-3" />
+                            View Auto-Generated Work Order &rarr;
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-[#8B7E66]">
+                            Line: {alert.lineOrPart || 'Plant-wide'}
+                          </span>
+                        )}
+
+                        {onAcknowledgeAlert && !alert.actionTaken && (
+                          <button
+                            onClick={() => onAcknowledgeAlert(alert.id)}
+                            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-white hover:bg-[#E9E9E0] text-[#5A5A40] border border-[#E5E5DE] transition-colors cursor-pointer"
+                          >
+                            <Check className="w-2.5 h-2.5" />
+                            Acknowledge
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#E5E5DE]">
+          <div className="mt-4 pt-3 border-t border-[#E5E5DE] flex items-center gap-2">
+            <button
+              onClick={() => onNavigate('maintenance')}
+              className="flex-1 text-center text-xs text-[#5A5A40] hover:text-[#2D2D24] font-semibold py-2 rounded-xl bg-[#F5F5F0] hover:bg-[#E9E9E0] border border-[#E5E5DE] transition-colors cursor-pointer"
+            >
+              CMMS Work Orders &rarr;
+            </button>
             <button
               onClick={() => onNavigate('workflows')}
-              className="w-full text-center text-xs text-[#5A5A40] hover:text-[#2D2D24] font-semibold py-2 rounded-xl bg-[#F5F5F0] hover:bg-[#E9E9E0] border border-[#E5E5DE] transition-colors cursor-pointer"
+              className="flex-1 text-center text-xs text-[#5A5A40] hover:text-[#2D2D24] font-semibold py-2 rounded-xl bg-[#F5F5F0] hover:bg-[#E9E9E0] border border-[#E5E5DE] transition-colors cursor-pointer"
             >
-              Open Low-Code Workflow Engine &rarr;
+              Workflow Automation &rarr;
             </button>
           </div>
         </div>

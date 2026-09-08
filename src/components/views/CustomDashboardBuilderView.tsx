@@ -468,7 +468,7 @@ export const CustomDashboardBuilderView: React.FC<CustomDashboardBuilderViewProp
 
   // Publish to Live Workflow
   const handlePublishToLive = () => {
-    const curVer = activeDashboard.version || 'v1.0';
+    const curVer = String(activeDashboard.version || 'v1.0');
     const num = parseFloat(curVer.replace('v', '')) || 1.0;
     const nextVer = `v${(num + 0.1).toFixed(1)}`;
 

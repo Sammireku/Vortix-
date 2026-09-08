@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 import {
   GripVertical,
   Maximize2,
@@ -1878,8 +1879,16 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
         )}
       </div>
 
-      {/* Widget Interactive Body */}
-      <div className="flex-1">{renderWidgetBody()}</div>
+      {/* Widget Interactive Body with Per-Widget Error Boundary */}
+      <div className="flex-1">
+        <WidgetErrorBoundary
+          widgetId={widget.id}
+          widgetTitle={widget.title}
+          onRemove={() => onRemove && onRemove(widget.id)}
+        >
+          {renderWidgetBody()}
+        </WidgetErrorBoundary>
+      </div>
     </div>
   );
 };

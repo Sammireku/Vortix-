@@ -33,7 +33,7 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Left: Powered by; Vortix Brand Badge & Slogan */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-[#F5F5F0] border border-[#E5E5DE] px-3 py-1.5 rounded-2xl shadow-2xs">
-            <VortixLogo size="sm" variant="mark" theme="light" />
+            <VortixLogo size="sm" variant="icon" theme="light" />
             <div className="flex items-center gap-1.5 font-medium">
               <span className="text-[#8B7E66] text-[11px]">powered by;</span>
               <span className="font-serif font-bold text-[#2D2D24] tracking-tight text-xs">vortix</span>

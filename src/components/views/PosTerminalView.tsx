@@ -29,6 +29,11 @@ import {
   FileText,
   Sliders,
   Tag,
+  Globe,
+  Award,
+  Coins,
+  History,
+  MapPin,
 } from 'lucide-react';
 import {
   PosProduct,
@@ -38,8 +43,24 @@ import {
   AppUser,
   PropertyReservation,
   Invoice,
+  PosCustomerProfile,
+  PosCurrency,
+  PosTaxRegionConfig,
 } from '../../types';
 import { PosInvoiceGeneratorModal } from '../modals/PosInvoiceGeneratorModal';
+import { ReceiptPreviewModal } from '../modals/ReceiptPreviewModal';
+import { PosTaxConfigModal } from '../modals/PosTaxConfigModal';
+import { PosCurrencyModal } from '../modals/PosCurrencyModal';
+import { PosCustomerLoyaltyPanel } from '../pos/PosCustomerLoyaltyPanel';
+import { PosCashDiscountPanel } from '../pos/PosCashDiscountPanel';
+import {
+  initialCustomerProfiles,
+  initialCurrencies,
+  initialTaxRegions,
+  calculateLoyaltyPointsEarned,
+  LOYALTY_REDEMPTION_RATE_PER_POINT,
+  formatCurrency,
+} from '../../data/posData';
 
 interface PosTerminalViewProps {
   currentUser: AppUser;
@@ -68,7 +89,28 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<PosCartItem[]>([]);
 
-  // Discount state: supports preset percentages as well as manual custom % or $ amounts
+  // Multi-Currency state
+  const [currencies, setCurrencies] = useState<PosCurrency[]>(initialCurrencies);
+  const [activeCurrency, setActiveCurrency] = useState<PosCurrency>(initialCurrencies[0]); // USD
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState<boolean>(false);
+
+  // Dynamic Regional Tax state
+  const [taxRegions, setTaxRegions] = useState<PosTaxRegionConfig[]>(initialTaxRegions);
+  const [activeTaxRegion, setActiveTaxRegion] = useState<PosTaxRegionConfig>(initialTaxRegions[0]); // Texas 8.25%
+  const [isTaxConfigModalOpen, setIsTaxConfigModalOpen] = useState<boolean>(false);
+
+  // Customer Profiles & Loyalty state
+  const [customers, setCustomers] = useState<PosCustomerProfile[]>(initialCustomerProfiles);
+  const [selectedCustomer, setSelectedCustomer] = useState<PosCustomerProfile | undefined>(initialCustomerProfiles[0]);
+  const [selectedCustomerType, setSelectedCustomerType] = useState<'loyalty' | 'walk_in' | 'corporate' | 'room_guest'>('loyalty');
+  const [pointsToRedeem, setPointsToRedeem] = useState<number>(0);
+
+  // Manual Cash Discount typing state
+  const [manualCashDiscount, setManualCashDiscount] = useState<number>(0);
+  const [manualCashInput, setManualCashInput] = useState<string>('');
+  const [cashDiscountReason, setCashDiscountReason] = useState<string>('');
+
+  // Preset percentage / flat discount state
   const [discountType, setDiscountType] = useState<'percentage' | 'amount'>('percentage');
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [manualDiscountInput, setManualDiscountInput] = useState<string>('');
@@ -87,7 +129,6 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
     poReference?: string;
   } | undefined>(undefined);
 
-  const [selectedCustomerType, setSelectedCustomerType] = useState<'walk_in' | 'corporate' | 'room_guest'>('walk_in');
   const [selectedReservationId, setSelectedReservationId] = useState<string>(activeReservations[0]?.id || '');
   const [corporateCustomerName, setCorporateCustomerName] = useState('Boeing Commercial Airplanes');
 
@@ -97,6 +138,7 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
   const [cashTendered, setCashTendered] = useState<number>(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<PosOrder | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   // Shift state
   const [shift, setShift] = useState<PosRegisterShift>({
@@ -192,22 +234,47 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
   // Calculations
   const rawSubtotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
-  let discountAmount = 0;
+  // 1. Standard preset percentage or flat discount
+  let standardDiscountAmount = 0;
   if (discountType === 'percentage') {
     const clampedPct = Math.min(100, Math.max(0, discountValue));
-    discountAmount = rawSubtotal * (clampedPct / 100);
+    standardDiscountAmount = rawSubtotal * (clampedPct / 100);
   } else {
-    discountAmount = Math.min(rawSubtotal, Math.max(0, discountValue));
+    standardDiscountAmount = Math.min(rawSubtotal, Math.max(0, discountValue));
   }
 
-  const discountedSubtotal = Math.max(0, rawSubtotal - discountAmount);
-  const effectiveDiscountPct = rawSubtotal > 0 ? (discountAmount / rawSubtotal) * 100 : 0;
+  // 2. Manual cash discount (manually typed in cash)
+  const remainingAfterStandard = Math.max(0, rawSubtotal - standardDiscountAmount);
+  const cashDiscountAmount = Math.min(remainingAfterStandard, Math.max(0, manualCashDiscount));
 
-  const taxTotal = cart.reduce((sum, item) => {
-    const itemSub = item.unitPrice * item.quantity * (1 - effectiveDiscountPct / 100);
-    return sum + itemSub * item.product.taxRate;
-  }, 0);
+  // 3. Loyalty points redemption (flat discount)
+  const remainingAfterCash = Math.max(0, remainingAfterStandard - cashDiscountAmount);
+  const maxRedeemablePoints =
+    selectedCustomer && selectedCustomerType === 'loyalty'
+      ? Math.min(selectedCustomer.loyaltyPoints, Math.floor(remainingAfterCash / LOYALTY_REDEMPTION_RATE_PER_POINT))
+      : 0;
+  const clampedPointsToRedeem = Math.min(pointsToRedeem, maxRedeemablePoints);
+  const loyaltyDiscountAmount = clampedPointsToRedeem * LOYALTY_REDEMPTION_RATE_PER_POINT;
+
+  // Total discount and taxable subtotal
+  const totalDiscountAmount = standardDiscountAmount + cashDiscountAmount + loyaltyDiscountAmount;
+  const discountedSubtotal = Math.max(0, rawSubtotal - totalDiscountAmount);
+
+  // 4. Dynamic Regional Tax Calculation (with optional wholesale exemption)
+  const isWholesale = activeTaxRegion.exemptWholesale && selectedCustomerType === 'corporate';
+  const effectiveTaxRate = isWholesale ? 0 : activeTaxRegion.rate;
+  const taxTotal = discountedSubtotal * effectiveTaxRate;
   const grandTotal = discountedSubtotal + taxTotal;
+
+  // Converted Currency equivalents
+  const convertedGrandTotal = grandTotal * activeCurrency.rate;
+  const convertedTaxTotal = taxTotal * activeCurrency.rate;
+
+  // Loyalty points earned on this sale
+  const pointsEarnedOnSale =
+    selectedCustomer && selectedCustomerType === 'loyalty'
+      ? calculateLoyaltyPointsEarned(grandTotal, selectedCustomer.tier)
+      : 0;
 
   const handleApplyPresetDiscount = (pct: number) => {
     if (!currentUser.dataAccess.canOverrideDiscounts && pct > 0) {
@@ -251,7 +318,9 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       items: [...cart],
       customer:
-        selectedCustomerType === 'room_guest'
+        selectedCustomerType === 'loyalty' && selectedCustomer
+          ? `${selectedCustomer.name} (${selectedCustomer.tier})`
+          : selectedCustomerType === 'room_guest'
           ? `Guest: ${activeReservations.find((r) => r.id === selectedReservationId)?.guestName || 'Room'}`
           : selectedCustomerType === 'corporate'
           ? corporateCustomerName
@@ -290,6 +359,15 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
           ? activeReservations.find((r) => r.id === selectedReservationId)
           : undefined;
 
+      const orderCustomerName =
+        selectedCustomerType === 'loyalty' && selectedCustomer
+          ? selectedCustomer.name
+          : selectedCustomerType === 'room_guest' && targetReservation
+          ? targetReservation.guestName
+          : selectedCustomerType === 'corporate'
+          ? corporateCustomerName
+          : 'Walk-In Customer';
+
       const orderRecord: PosOrder = {
         id: `ord-${Date.now()}`,
         orderNumber: `ORD-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -297,18 +375,13 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
         items: [...cart],
         subtotal: rawSubtotal,
         taxTotal,
-        discountTotal: discountAmount,
+        discountTotal: totalDiscountAmount,
         grandTotal,
         paymentMethod,
         paymentStatus: 'completed',
         cashierId: currentUser.id,
         cashierName: currentUser.fullName,
-        customerName:
-          selectedCustomerType === 'room_guest' && targetReservation
-            ? targetReservation.guestName
-            : selectedCustomerType === 'corporate'
-            ? corporateCustomerName
-            : 'Walk-In Customer',
+        customerName: orderCustomerName,
         roomChargeDetails: targetReservation
           ? {
               reservationId: targetReservation.id,
@@ -319,6 +392,21 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         amountTendered: paymentMethod === 'cash' ? cashTendered : grandTotal,
         changeDue: paymentMethod === 'cash' ? Math.max(0, cashTendered - grandTotal) : 0,
+        // Loyalty tracking link
+        customerId: selectedCustomerType === 'loyalty' ? selectedCustomer?.id : undefined,
+        loyaltyPointsEarned: pointsEarnedOnSale,
+        loyaltyPointsRedeemed: clampedPointsToRedeem,
+        loyaltyDiscountAmount: loyaltyDiscountAmount,
+        cashDiscountAmount: cashDiscountAmount,
+        // Multi-currency details
+        currencyCode: activeCurrency.code,
+        currencyRate: activeCurrency.rate,
+        currencySymbol: activeCurrency.symbol,
+        // Dynamic Regional Tax details
+        taxRegionId: activeTaxRegion.id,
+        taxRegionName: activeTaxRegion.regionName,
+        taxLabel: activeTaxRegion.taxLabel,
+        taxRateApplied: effectiveTaxRate,
       };
 
       // Decrement product inventory
@@ -348,6 +436,37 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
         );
       }
 
+      // Update customer loyalty points and order history log
+      if (selectedCustomerType === 'loyalty' && selectedCustomer) {
+        const historyEntry = {
+          orderId: orderRecord.id,
+          orderNumber: orderRecord.orderNumber,
+          date: new Date().toISOString().split('T')[0],
+          total: grandTotal,
+          pointsEarned: pointsEarnedOnSale,
+          pointsRedeemed: clampedPointsToRedeem,
+          currency: activeCurrency.code,
+        };
+
+        setCustomers((prev) =>
+          prev.map((c) => {
+            if (c.id === selectedCustomer.id) {
+              const netPoints = Math.max(0, c.loyaltyPoints - clampedPointsToRedeem) + pointsEarnedOnSale;
+              const updatedCustomer: PosCustomerProfile = {
+                ...c,
+                loyaltyPoints: netPoints,
+                lifetimePointsEarned: c.lifetimePointsEarned + pointsEarnedOnSale,
+                lifetimeSpend: c.lifetimeSpend + grandTotal,
+                orderHistory: [historyEntry, ...(c.orderHistory || [])],
+              };
+              setSelectedCustomer(updatedCustomer);
+              return updatedCustomer;
+            }
+            return c;
+          })
+        );
+      }
+
       // Update shift stats
       setShift((prev) => ({
         ...prev,
@@ -364,11 +483,19 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
       }));
 
       setCompletedOrder(orderRecord);
+      setIsReceiptModalOpen(true);
+      setIsCheckoutModalOpen(false);
       setCart([]);
       handleClearDiscount();
+      setManualCashDiscount(0);
+      setManualCashInput('');
+      setCashDiscountReason('');
+      setPointsToRedeem(0);
+
       onShowNotification?.(
         'Payment Approved',
-        `Transaction ${orderRecord.orderNumber} processed successfully ($${grandTotal.toFixed(2)}).`
+        `Transaction ${orderRecord.orderNumber} processed successfully ($${grandTotal.toFixed(2)} USD).`,
+        'success'
       );
     }, 900);
   };
@@ -385,7 +512,15 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
     const itemsToInvoice = customItems || cart;
     setInvoiceInitialItems(itemsToInvoice);
     setInvoiceCustomerPreset(
-      selectedCustomerType === 'corporate'
+      selectedCustomerType === 'loyalty' && selectedCustomer
+        ? {
+            name: selectedCustomer.name,
+            company: selectedCustomer.company,
+            email: selectedCustomer.email,
+            phone: selectedCustomer.phone,
+            poReference: `LOYALTY-${selectedCustomer.id.slice(-4).toUpperCase()}`,
+          }
+        : selectedCustomerType === 'corporate'
         ? { name: corporateCustomerName, company: 'Commercial Account' }
         : selectedCustomerType === 'room_guest'
         ? {
@@ -419,14 +554,39 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Multi-Currency Conversion Button */}
+          <button
+            onClick={() => setIsCurrencyModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#5A5A40]/30 text-xs font-semibold text-[#5A5A40] rounded-xl transition-colors cursor-pointer shadow-xs"
+            title="Convert and select active currency"
+          >
+            <Globe className="w-4 h-4 text-[#5A5A40]" />
+            <span className="font-mono">{activeCurrency.code} ({activeCurrency.symbol})</span>
+            {activeCurrency.rate !== 1 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#5A5A40]/10 font-normal">
+                x{activeCurrency.rate}
+              </span>
+            )}
+          </button>
+
+          {/* Regional Tax Configuration Button */}
+          <button
+            onClick={() => setIsTaxConfigModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#5A5A40]/30 text-xs font-semibold text-[#5A5A40] rounded-xl transition-colors cursor-pointer shadow-xs"
+            title="Configure POS dynamic regional tax rates"
+          >
+            <MapPin className="w-4 h-4 text-[#5A5A40]" />
+            <span>Tax: {activeTaxRegion.regionName} ({(effectiveTaxRate * 100).toFixed(1)}%)</span>
+          </button>
+
           <button
             onClick={() => handleOpenInvoiceModal()}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#5A5A40]/30 text-xs font-semibold text-[#5A5A40] rounded-xl transition-colors cursor-pointer shadow-xs"
             title="Generate custom single or multi-item official invoice"
           >
             <FileText className="w-4 h-4 text-[#5A5A40]" />
-            <span>Invoice Generator</span>
+            <span>Invoice</span>
           </button>
 
           <button
@@ -434,7 +594,7 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#E5E5DE] text-xs font-semibold text-[#5A5A40] rounded-xl transition-colors cursor-pointer"
           >
             <Barcode className="w-4 h-4" />
-            <span>Simulate Scan</span>
+            <span>Scan</span>
           </button>
 
           <button
@@ -542,7 +702,16 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
                   <div className="mt-3 pt-2 border-t border-[#E5E5DE] flex items-center justify-between">
                     <div>
                       <div className="text-sm font-bold font-serif text-[#2D2D24]">
-                        ${product.price.toFixed(2)}
+                        {activeCurrency.code === 'USD' ? (
+                          <span>${product.price.toFixed(2)}</span>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span>{formatCurrency(product.price, activeCurrency)}</span>
+                            <span className="text-[10px] text-[#8B7E66] font-mono font-normal">
+                              ${product.price.toFixed(2)} USD
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div
                         className={`text-[10px] font-medium ${
@@ -589,78 +758,30 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
               )}
             </div>
 
-            {/* Customer Type Selector */}
-            <div className="mt-3 p-2.5 rounded-2xl bg-[#FAF9F5] border border-[#E5E5DE] space-y-2">
-              <div className="text-[11px] font-semibold text-[#8B7E66] uppercase tracking-wider">
-                Customer & Account Link
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 text-xs">
-                <button
-                  onClick={() => setSelectedCustomerType('walk_in')}
-                  className={`py-1.5 px-2 rounded-xl font-medium transition-colors cursor-pointer ${
-                    selectedCustomerType === 'walk_in'
-                      ? 'bg-[#5A5A40] text-white'
-                      : 'bg-white text-[#2D2D24] border border-[#E5E5DE]'
-                  }`}
-                >
-                  Walk-In
-                </button>
-
-                <button
-                  onClick={() => setSelectedCustomerType('room_guest')}
-                  className={`py-1.5 px-2 rounded-xl font-medium transition-colors cursor-pointer ${
-                    selectedCustomerType === 'room_guest'
-                      ? 'bg-[#5A5A40] text-white'
-                      : 'bg-white text-[#2D2D24] border border-[#E5E5DE]'
-                  }`}
-                >
-                  Room Folio
-                </button>
-
-                <button
-                  onClick={() => setSelectedCustomerType('corporate')}
-                  className={`py-1.5 px-2 rounded-xl font-medium transition-colors cursor-pointer ${
-                    selectedCustomerType === 'corporate'
-                      ? 'bg-[#5A5A40] text-white'
-                      : 'bg-white text-[#2D2D24] border border-[#E5E5DE]'
-                  }`}
-                >
-                  Corp Account
-                </button>
-              </div>
-
-              {selectedCustomerType === 'room_guest' && (
-                <div className="pt-1.5">
-                  <label className="block text-[11px] text-[#5A5A40] font-medium mb-1">
-                    Charge to In-House Reservation:
-                  </label>
-                  <select
-                    value={selectedReservationId}
-                    onChange={(e) => setSelectedReservationId(e.target.value)}
-                    className="w-full text-xs bg-white border border-[#E5E5DE] rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-[#5A5A40]"
-                  >
-                    {activeReservations.map((res) => (
-                      <option key={res.id} value={res.id}>
-                        {res.unitNumber} - {res.guestName} ({res.propertyName})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {selectedCustomerType === 'corporate' && (
-                <div className="pt-1.5">
-                  <label className="block text-[11px] text-[#5A5A40] font-medium mb-1">
-                    Corporate PO Account:
-                  </label>
-                  <input
-                    type="text"
-                    value={corporateCustomerName}
-                    onChange={(e) => setCorporateCustomerName(e.target.value)}
-                    className="w-full text-xs bg-white border border-[#E5E5DE] rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-[#5A5A40]"
-                  />
-                </div>
-              )}
+            {/* Customer & Loyalty Account Link */}
+            <div className="mt-3">
+              <PosCustomerLoyaltyPanel
+                customers={customers}
+                selectedCustomer={selectedCustomer}
+                onSelectCustomer={setSelectedCustomer}
+                selectedCustomerType={selectedCustomerType}
+                onChangeCustomerType={setSelectedCustomerType}
+                pointsToRedeem={pointsToRedeem}
+                onPointsToRedeemChange={setPointsToRedeem}
+                maxRedeemablePoints={maxRedeemablePoints}
+                activeReservations={activeReservations}
+                selectedReservationId={selectedReservationId}
+                onSelectReservationId={setSelectedReservationId}
+                corporateCustomerName={corporateCustomerName}
+                onCorporateCustomerNameChange={setCorporateCustomerName}
+                onAddNewCustomer={(newCust) => {
+                  setCustomers((prev) => [newCust, ...prev]);
+                  setSelectedCustomer(newCust);
+                  setSelectedCustomerType('loyalty');
+                  onShowNotification?.('Customer Profile Added', `${newCust.name} enrolled in loyalty program.`, 'success');
+                }}
+                onShowNotification={onShowNotification}
+              />
             </div>
 
             {/* Cart Items List */}
@@ -718,11 +839,11 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
 
             {/* Discount and Cart Action Controls */}
             {cart.length > 0 && (
-              <div className="pt-2 border-t border-[#E5E5DE] space-y-2 text-xs">
-                {/* Preset & Manual Toggle */}
+              <div className="pt-2 border-t border-[#E5E5DE] space-y-2.5 text-xs">
+                {/* Preset & Manual Percentage Discount Buttons */}
                 <div className="flex items-center justify-between gap-1.5 flex-wrap">
                   <span className="text-[11px] font-semibold text-[#8B7E66] flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-[#5A5A40]" /> Discount:
+                    <Tag className="w-3 h-3 text-[#5A5A40]" /> Preset %:
                   </span>
                   <div className="flex items-center gap-1 flex-wrap">
                     {[0, 5, 10, 15, 20].map((pct) => (
@@ -748,17 +869,17 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
                       title="Apply manual percentage or flat dollar discount"
                     >
                       <Sliders className="w-2.5 h-2.5" />
-                      <span>Manual</span>
+                      <span>Custom %</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Expandable Manual Discount Entry Panel */}
+                {/* Expandable Manual Percentage/Flat Discount Entry Panel */}
                 {isManualDiscountOpen && (
                   <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-[#E5E5DE] space-y-2 animate-in fade-in duration-150">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider">
-                        Manual Discount Override
+                        Percentage / Flat Discount
                       </span>
                       <div className="flex items-center bg-white p-0.5 rounded-lg border border-[#E5E5DE] text-[10px]">
                         <button
@@ -822,41 +943,11 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
                       </button>
                     </div>
 
-                    {/* Quick suggestion buttons */}
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-[10px] text-[#8B7E66]">Quick:</span>
-                      {discountType === 'percentage'
-                        ? [7.5, 12, 25, 50].map((p) => (
-                            <button
-                              key={p}
-                              onClick={() => {
-                                setManualDiscountInput(p.toString());
-                                handleApplyManualDiscount('percentage', p);
-                              }}
-                              className="px-1.5 py-0.5 bg-white border border-[#E5E5DE] hover:border-[#5A5A40] rounded text-[10px] text-[#5A5A40] font-medium cursor-pointer"
-                            >
-                              {p}%
-                            </button>
-                          ))
-                        : [5, 10, 25, 50].map((amt) => (
-                            <button
-                              key={amt}
-                              onClick={() => {
-                                setManualDiscountInput(amt.toString());
-                                handleApplyManualDiscount('amount', amt);
-                              }}
-                              className="px-1.5 py-0.5 bg-white border border-[#E5E5DE] hover:border-[#5A5A40] rounded text-[10px] text-[#5A5A40] font-medium cursor-pointer"
-                            >
-                              ${amt}
-                            </button>
-                          ))}
-                    </div>
-
                     {/* Discount Reason Tag */}
                     <div>
                       <input
                         type="text"
-                        placeholder="Reason (e.g. Loyalty, Damaged Box, Staff)"
+                        placeholder="Reason (e.g. Clearance, Damaged, Staff)"
                         value={discountReason}
                         onChange={(e) => setDiscountReason(e.target.value)}
                         className="w-full px-2 py-1 bg-white border border-[#E5E5DE] rounded-lg text-[11px] text-[#5A5A40] placeholder:text-[#8B7E66]/60 focus:outline-none focus:border-[#5A5A40]"
@@ -865,8 +956,22 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
                   </div>
                 )}
 
+                {/* Manually Typing Discount Amount in Cash Panel */}
+                <PosCashDiscountPanel
+                  manualCashDiscount={manualCashDiscount}
+                  manualCashInput={manualCashInput}
+                  onManualCashInputChange={setManualCashInput}
+                  onApplyCashDiscount={setManualCashDiscount}
+                  cashDiscountReason={cashDiscountReason}
+                  onCashDiscountReasonChange={setCashDiscountReason}
+                  rawSubtotal={rawSubtotal}
+                  currency={activeCurrency}
+                  canOverrideDiscounts={currentUser.dataAccess.canOverrideDiscounts}
+                  onShowNotification={onShowNotification}
+                />
+
                 {/* Cart Action Buttons: Hold, Invoice, Recall */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 pt-1">
                   <button
                     onClick={handleParkOrder}
                     className="flex-1 py-1.5 rounded-xl border border-[#E5E5DE] bg-[#FAF9F5] hover:bg-[#F5F5F0] text-[11px] font-medium text-[#5A5A40] flex items-center justify-center gap-1 cursor-pointer"
@@ -898,10 +1003,38 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
             {/* Financial Summary */}
             <div className="mt-3 pt-3 border-t border-[#E5E5DE] space-y-1.5 text-xs">
               <div className="flex justify-between text-[#8B7E66]">
-                <span>Subtotal:</span>
-                <span>${rawSubtotal.toFixed(2)}</span>
+                <span>Catalog Subtotal:</span>
+                <span>
+                  ${rawSubtotal.toFixed(2)} USD
+                  {activeCurrency.code !== 'USD' && ` • ${formatCurrency(rawSubtotal, activeCurrency)}`}
+                </span>
               </div>
-              {discountAmount > 0 && (
+
+              {/* Cash Discount */}
+              {cashDiscountAmount > 0 && (
+                <div className="flex justify-between text-emerald-700 font-medium">
+                  <span className="flex items-center gap-1">
+                    <span>
+                      Cash Discount ({cashDiscountReason || 'Manually Typed'}):
+                    </span>
+                    <button
+                      onClick={() => {
+                        setManualCashDiscount(0);
+                        setManualCashInput('');
+                        setCashDiscountReason('');
+                      }}
+                      className="text-[11px] text-red-500 hover:text-red-700 ml-1 cursor-pointer font-bold"
+                      title="Clear cash discount"
+                    >
+                      ×
+                    </button>
+                  </span>
+                  <span>-${cashDiscountAmount.toFixed(2)} USD</span>
+                </div>
+              )}
+
+              {/* Standard Discount */}
+              {standardDiscountAmount > 0 && (
                 <div className="flex justify-between text-emerald-700 font-medium">
                   <span className="flex items-center gap-1">
                     <span>
@@ -916,16 +1049,62 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
                       ×
                     </button>
                   </span>
-                  <span>-${discountAmount.toFixed(2)}</span>
+                  <span>-${standardDiscountAmount.toFixed(2)} USD</span>
                 </div>
               )}
+
+              {/* Loyalty Discount */}
+              {loyaltyDiscountAmount > 0 && (
+                <div className="flex justify-between text-amber-700 font-medium">
+                  <span className="flex items-center gap-1">
+                    <span>Loyalty Rewards ({clampedPointsToRedeem} pts):</span>
+                    <button
+                      onClick={() => setPointsToRedeem(0)}
+                      className="text-[11px] text-red-500 hover:text-red-700 ml-1 cursor-pointer font-bold"
+                      title="Remove loyalty redemption"
+                    >
+                      ×
+                    </button>
+                  </span>
+                  <span>-${loyaltyDiscountAmount.toFixed(2)} USD</span>
+                </div>
+              )}
+
+              {/* Regional Tax */}
               <div className="flex justify-between text-[#8B7E66]">
-                <span>Tax (8.25%):</span>
-                <span>${taxTotal.toFixed(2)}</span>
+                <span className="flex items-center gap-1">
+                  <span>Tax ({activeTaxRegion.taxLabel} @ {(effectiveTaxRate * 100).toFixed(2)}%):</span>
+                  <button
+                    onClick={() => setIsTaxConfigModalOpen(true)}
+                    className="text-[10px] text-[#5A5A40] underline hover:text-[#2D2D24] cursor-pointer"
+                  >
+                    {activeTaxRegion.regionName}
+                  </button>
+                </span>
+                <span>
+                  ${taxTotal.toFixed(2)} USD
+                  {activeCurrency.code !== 'USD' && ` • ${formatCurrency(taxTotal, activeCurrency)}`}
+                </span>
               </div>
-              <div className="flex justify-between text-base font-bold font-serif text-[#2D2D24] pt-2 border-t border-[#E5E5DE]">
-                <span>Grand Total:</span>
-                <span>${grandTotal.toFixed(2)}</span>
+
+              {/* Grand Total */}
+              <div className="pt-2 border-t border-[#E5E5DE]">
+                <div className="flex justify-between items-baseline text-base font-bold font-serif text-[#2D2D24]">
+                  <span>Grand Total:</span>
+                  <span>${grandTotal.toFixed(2)} USD</span>
+                </div>
+                {activeCurrency.code !== 'USD' && (
+                  <div className="flex justify-between items-baseline text-xs font-mono font-bold text-blue-800 mt-0.5">
+                    <span>Converted ({activeCurrency.code}):</span>
+                    <span>{formatCurrency(grandTotal, activeCurrency)}</span>
+                  </div>
+                )}
+                {selectedCustomerType === 'loyalty' && selectedCustomer && (
+                  <div className="text-[10px] text-amber-800 mt-1 flex items-center justify-between bg-amber-50/70 p-1.5 rounded-lg border border-amber-200/60">
+                    <span>Reward on checkout:</span>
+                    <span className="font-bold">+{pointsEarnedOnSale} points</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -935,7 +1114,10 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
               onClick={handleStartCheckout}
               className="mt-4 w-full py-3 rounded-2xl bg-[#5A5A40] hover:bg-[#474732] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
             >
-              <span>Collect ${grandTotal.toFixed(2)}</span>
+              <span>
+                Collect ${grandTotal.toFixed(2)} USD
+                {activeCurrency.code !== 'USD' ? ` • ${formatCurrency(grandTotal, activeCurrency)}` : ''}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -1175,136 +1357,107 @@ export const PosTerminalView: React.FC<PosTerminalViewProps> = ({
         </div>
       )}
 
-      {/* COMPLETED RECEIPT MODAL */}
-      {completedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-[#E5E5DE] rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[92vh]">
-            <div className="p-4 border-b border-[#E5E5DE] flex items-center justify-between bg-[#FAF9F5]">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-[#5A5A40]" />
-                <span className="font-bold text-xs text-[#2D2D24]">Transaction Approved</span>
-              </div>
-              <button
-                onClick={() => setCompletedOrder(null)}
-                className="p-1 rounded-xl text-[#8B7E66] hover:text-[#2D2D24] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* STYLIZED DIGITAL RECEIPT PREVIEW MODAL */}
+      <ReceiptPreviewModal
+        isOpen={isReceiptModalOpen && !!completedOrder}
+        onClose={() => {
+          setIsReceiptModalOpen(false);
+          setCompletedOrder(null);
+        }}
+        order={completedOrder}
+        currency={activeCurrency}
+        taxRegion={activeTaxRegion}
+        customerProfile={customers.find((c) => c.id === completedOrder?.customerId)}
+        onPrint={() => {
+          onShowNotification?.(
+            'Thermal Dispatch',
+            `Receipt #${completedOrder?.receiptNumber} dispatched to receipt printer with applied discounts and tax breakdown.`,
+            'info'
+          );
+        }}
+        onEmailReceipt={(email) => {
+          onShowNotification?.(
+            'Receipt Dispatched',
+            `Itemized digital receipt emailed to ${email}.`,
+            'success'
+          );
+        }}
+        onOpenInvoice={() => {
+          if (completedOrder) {
+            setInvoiceInitialItems(completedOrder.items);
+            setInvoiceCustomerPreset({
+              name: completedOrder.customerName || 'Customer',
+              poReference: completedOrder.orderNumber,
+              email: completedOrder.customerEmail,
+            });
+            setIsReceiptModalOpen(false);
+            setIsInvoiceModalOpen(true);
+          }
+        }}
+        onNewSale={() => {
+          setIsReceiptModalOpen(false);
+          setCompletedOrder(null);
+        }}
+        onShowNotification={onShowNotification}
+      />
 
-            {/* Thermal Style Receipt Container */}
-            <div className="p-5 overflow-y-auto font-mono text-xs text-[#2D2D24] space-y-3 bg-[#FCFCFA]">
-              <div className="text-center space-y-0.5">
-                <div className="font-bold text-sm tracking-wider">VORTIX DEPOT & POS</div>
-                <div className="text-[10px] text-[#8B7E66]">Midwest Machining & Campus Hub</div>
-                <div className="text-[10px] text-[#8B7E66]">Tax ID: 84-2918841-B</div>
-                <div className="text-[10px] text-[#8B7E66]">{completedOrder.timestamp}</div>
-              </div>
+      {/* REGIONAL TAX CONFIGURATION MODAL */}
+      <PosTaxConfigModal
+        isOpen={isTaxConfigModalOpen}
+        onClose={() => setIsTaxConfigModalOpen(false)}
+        taxRegions={taxRegions}
+        activeTaxRegion={activeTaxRegion}
+        onSelectTaxRegion={(region) => {
+          setActiveTaxRegion(region);
+          onShowNotification?.(
+            'Tax Region Selected',
+            `Applied ${region.regionName} (${(region.taxRate * 100).toFixed(2)}% ${region.taxLabel}).`,
+            'info'
+          );
+        }}
+        onSaveTaxRegions={(updated) => {
+          setTaxRegions(updated);
+        }}
+        onShowNotification={onShowNotification}
+      />
 
-              <div className="border-t border-dashed border-[#B0B0A0] pt-2 text-[10px] space-y-0.5">
-                <div>ORDER: {completedOrder.orderNumber}</div>
-                <div>RECEIPT: {completedOrder.receiptNumber}</div>
-                <div>CASHIER: {completedOrder.cashierName}</div>
-                <div>CUSTOMER: {completedOrder.customerName}</div>
-                <div>METHOD: {completedOrder.paymentMethod.toUpperCase()}</div>
-              </div>
-
-              <div className="border-t border-dashed border-[#B0B0A0] pt-2 space-y-1 text-[11px]">
-                {completedOrder.items.map((item) => (
-                  <div key={item.id} className="flex justify-between">
-                    <span className="truncate max-w-[170px]">
-                      {item.quantity}x {item.product.name}
-                    </span>
-                    <span>${(item.unitPrice * item.quantity).toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t border-dashed border-[#B0B0A0] pt-2 space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span>SUBTOTAL:</span>
-                  <span>${completedOrder.subtotal.toFixed(2)}</span>
-                </div>
-                {completedOrder.discountTotal > 0 && (
-                  <div className="flex justify-between text-emerald-700">
-                    <span>DISCOUNT:</span>
-                    <span>-${completedOrder.discountTotal.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span>TAX:</span>
-                  <span>${completedOrder.taxTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-sm pt-1 border-t border-[#2D2D24]">
-                  <span>TOTAL:</span>
-                  <span>${completedOrder.grandTotal.toFixed(2)}</span>
-                </div>
-                {completedOrder.paymentMethod === 'cash' && (
-                  <>
-                    <div className="flex justify-between text-[11px]">
-                      <span>TENDERED:</span>
-                      <span>${(completedOrder.amountTendered || 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px] font-bold text-emerald-700">
-                      <span>CHANGE:</span>
-                      <span>${(completedOrder.changeDue || 0).toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Barcode representation */}
-              <div className="border-t border-dashed border-[#B0B0A0] pt-3 text-center space-y-1">
-                <div className="tracking-[4px] font-bold text-sm">||||| | |||| ||| ||||</div>
-                <div className="text-[9px] text-[#8B7E66]">{completedOrder.receiptNumber}</div>
-                <div className="text-[10px] italic text-[#8B7E66] pt-1">Thank you for orchestrating with Vortix!</div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-[#E5E5DE] bg-white flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={() => {
-                    onShowNotification?.('Printing', 'Receipt dispatched to thermal receipt printer.');
-                  }}
-                  className="flex-1 py-2 rounded-xl border border-[#E5E5DE] hover:bg-[#F5F5F0] text-xs font-semibold text-[#5A5A40] flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Print Receipt
-                </button>
-                <button
-                  onClick={() => {
-                    if (completedOrder) {
-                      setInvoiceInitialItems(completedOrder.items);
-                      setInvoiceCustomerPreset({
-                        name: completedOrder.customerName || 'Customer',
-                        poReference: completedOrder.orderNumber,
-                      });
-                      setIsInvoiceModalOpen(true);
-                    }
-                  }}
-                  className="flex-1 py-2 rounded-xl bg-[#FAF9F5] hover:bg-[#F5F5F0] border border-[#5A5A40]/30 text-[#5A5A40] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5" /> Official Invoice
-                </button>
-              </div>
-              <button
-                onClick={() => setCompletedOrder(null)}
-                className="w-full py-2 rounded-xl bg-[#5A5A40] hover:bg-[#474732] text-white text-xs font-bold cursor-pointer transition-colors"
-              >
-                New Sale
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MULTI-CURRENCY CONVERSION MODAL */}
+      <PosCurrencyModal
+        isOpen={isCurrencyModalOpen}
+        onClose={() => setIsCurrencyModalOpen(false)}
+        currencies={currencies}
+        activeCurrency={activeCurrency}
+        onSelectCurrency={(curr) => {
+          setActiveCurrency(curr);
+          onShowNotification?.(
+            'Currency Updated',
+            `Active POS currency set to ${curr.name} (${curr.code} ${curr.symbol}). Conversion rate: ${curr.rate}`,
+            'info'
+          );
+        }}
+        onUpdateCurrencyRate={(code, newRate) => {
+          setCurrencies((prev) =>
+            prev.map((c) => (c.code === code ? { ...c, rate: newRate } : c))
+          );
+          if (activeCurrency.code === code) {
+            setActiveCurrency((prev) => ({ ...prev, rate: newRate }));
+          }
+        }}
+        currentUser={currentUser}
+        onShowNotification={onShowNotification}
+      />
 
       {/* POS INVOICE GENERATOR MODAL */}
       <PosInvoiceGeneratorModal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}
+        currentUser={currentUser}
         availableProducts={products}
         initialItems={invoiceInitialItems}
         customerPreset={invoiceCustomerPreset}
+        regionalTaxRate={effectiveTaxRate}
+        regionalTaxLabel={activeTaxRegion.taxLabel}
+        currency={activeCurrency}
         onLoadItemsToCart={(items) => {
           setCart(items);
           onShowNotification?.(

@@ -1,0 +1,357 @@
+import { PosCustomerProfile, PosCurrency, PosTaxRegionConfig } from '../types';
+
+export const initialCustomerProfiles: PosCustomerProfile[] = [
+  {
+    id: 'cust-001',
+    name: 'Eleanor Vance',
+    email: 'e.vance@aerodynamics.com',
+    phone: '+1 (555) 382-9102',
+    company: 'AeroDynamics Aerospace Corp',
+    address: 'Building 4B, Aerospace Parkway, Seattle, WA',
+    tier: 'Platinum',
+    loyaltyPoints: 1450,
+    lifetimePointsEarned: 3200,
+    lifetimeSpend: 14250.0,
+    joinedDate: '2024-03-15',
+    notes: 'Direct flight hardware procurement officer. Eligible for Platinum 2x points multiplier.',
+    orderHistory: [
+      {
+        orderId: 'ord-hist-101',
+        orderNumber: 'ORD-98212',
+        date: '2026-08-18',
+        total: 1845.0,
+        pointsEarned: 369,
+        currency: 'USD',
+      },
+      {
+        orderId: 'ord-hist-102',
+        orderNumber: 'ORD-89410',
+        date: '2026-07-29',
+        total: 3420.0,
+        pointsEarned: 684,
+        pointsRedeemed: 300,
+        currency: 'USD',
+      },
+      {
+        orderId: 'ord-hist-103',
+        orderNumber: 'ORD-77123',
+        date: '2026-06-12',
+        total: 920.0,
+        pointsEarned: 184,
+        currency: 'USD',
+      },
+    ],
+  },
+  {
+    id: 'cust-002',
+    name: 'Marcus Sterling',
+    email: 'marcus.sterling@boeing.com',
+    phone: '+1 (555) 721-4491',
+    company: 'Boeing Commercial Airplanes',
+    address: 'Hangar 12, Renton Municipal Airport, WA',
+    tier: 'Gold',
+    loyaltyPoints: 820,
+    lifetimePointsEarned: 1890,
+    lifetimeSpend: 8950.0,
+    joinedDate: '2024-06-01',
+    notes: 'Commercial tooling specialist. Corporate Net-30 approved.',
+    orderHistory: [
+      {
+        orderId: 'ord-hist-201',
+        orderNumber: 'ORD-66321',
+        date: '2026-08-25',
+        total: 1240.0,
+        pointsEarned: 186,
+        currency: 'USD',
+      },
+      {
+        orderId: 'ord-hist-202',
+        orderNumber: 'ORD-54190',
+        date: '2026-07-10',
+        total: 2150.0,
+        pointsEarned: 322,
+        currency: 'USD',
+      },
+    ],
+  },
+  {
+    id: 'cust-003',
+    name: 'Dr. Julian Chen',
+    email: 'j.chen@mit.edu',
+    phone: '+1 (555) 902-1847',
+    company: 'MIT Lincoln Laboratory',
+    address: 'Campus Loft 102, Vortix Tech Park',
+    tier: 'Gold',
+    loyaltyPoints: 950,
+    lifetimePointsEarned: 1600,
+    lifetimeSpend: 7800.0,
+    joinedDate: '2024-09-10',
+    notes: 'In-house visiting researcher. Stays at Campus Loft 102. Authorized room folio and loyalty redemption.',
+    orderHistory: [
+      {
+        orderId: 'ord-hist-301',
+        orderNumber: 'ORD-43102',
+        date: '2026-08-30',
+        total: 680.0,
+        pointsEarned: 102,
+        currency: 'USD',
+      },
+    ],
+  },
+  {
+    id: 'cust-004',
+    name: 'Elena Rostova',
+    email: 'elena.rostova@orbitallaunch.io',
+    phone: '+1 (555) 443-8821',
+    company: 'Orbital Launch Systems Ltd',
+    address: 'Suite 800, Space Commerce Way, Cape Canaveral, FL',
+    tier: 'Silver',
+    loyaltyPoints: 480,
+    lifetimePointsEarned: 950,
+    lifetimeSpend: 3200.0,
+    joinedDate: '2025-01-20',
+    notes: 'Avionics and propulsion components buyer.',
+    orderHistory: [
+      {
+        orderId: 'ord-hist-401',
+        orderNumber: 'ORD-31998',
+        date: '2026-08-05',
+        total: 890.0,
+        pointsEarned: 106,
+        currency: 'USD',
+      },
+    ],
+  },
+  {
+    id: 'cust-005',
+    name: 'Sarah Jenkins',
+    email: 'sjenkins@midwestmachining.com',
+    phone: '+1 (555) 881-2299',
+    company: 'Midwest Machining & Fab LLC',
+    address: '14 Industrial Way, Columbus, OH',
+    tier: 'Bronze',
+    loyaltyPoints: 160,
+    lifetimePointsEarned: 240,
+    lifetimeSpend: 1150.0,
+    joinedDate: '2025-04-12',
+    notes: 'Shop floor manager. Regular customer for fasteners and drill bits.',
+    orderHistory: [],
+  },
+  {
+    id: 'cust-006',
+    name: 'Alexander Rossi',
+    email: 'alex.rossi@eurotech-aviation.de',
+    phone: '+49 89 2109 849',
+    company: 'EuroTech Aviation GmbH',
+    address: 'Flughafenallee 24, Munich, Germany',
+    tier: 'Silver',
+    loyaltyPoints: 520,
+    lifetimePointsEarned: 1100,
+    lifetimeSpend: 4400.0,
+    joinedDate: '2025-02-14',
+    notes: 'European aerospace contractor. Uses EUR currency for invoicing.',
+    orderHistory: [],
+  },
+];
+
+export const initialCurrencies: PosCurrency[] = [
+  {
+    code: 'USD',
+    symbol: '$',
+    name: 'US Dollar',
+    rate: 1.0,
+    flag: '🇺🇸',
+    decimals: 2,
+  },
+  {
+    code: 'EUR',
+    symbol: '€',
+    name: 'Euro',
+    rate: 0.92,
+    flag: '🇪🇺',
+    decimals: 2,
+  },
+  {
+    code: 'GBP',
+    symbol: '£',
+    name: 'British Pound',
+    rate: 0.78,
+    flag: '🇬🇧',
+    decimals: 2,
+  },
+  {
+    code: 'JPY',
+    symbol: '¥',
+    name: 'Japanese Yen',
+    rate: 152.4,
+    flag: '🇯🇵',
+    decimals: 0,
+  },
+  {
+    code: 'CAD',
+    symbol: 'C$',
+    name: 'Canadian Dollar',
+    rate: 1.36,
+    flag: '🇨🇦',
+    decimals: 2,
+  },
+  {
+    code: 'AUD',
+    symbol: 'A$',
+    name: 'Australian Dollar',
+    rate: 1.52,
+    flag: '🇦🇺',
+    decimals: 2,
+  },
+  {
+    code: 'CHF',
+    symbol: 'Fr',
+    name: 'Swiss Franc',
+    rate: 0.88,
+    flag: '🇨🇭',
+    decimals: 2,
+  },
+  {
+    code: 'AED',
+    symbol: 'AED',
+    name: 'UAE Dirham',
+    rate: 3.67,
+    flag: '🇦🇪',
+    decimals: 2,
+  },
+];
+
+export const initialTaxRegions: PosTaxRegionConfig[] = [
+  {
+    id: 'tax-us-tx',
+    regionName: 'United States - Texas (Default)',
+    taxLabel: 'State & Local Sales Tax',
+    rate: 0.0825,
+    countryCode: 'US',
+    jurisdiction: 'Texas Comptroller (6.25% State + 2.0% Local)',
+    isDefault: true,
+    notes: 'Default warehouse and depot regional rate.',
+  },
+  {
+    id: 'tax-us-ca',
+    regionName: 'United States - California',
+    taxLabel: 'CA State & District Tax',
+    rate: 0.095,
+    countryCode: 'US',
+    jurisdiction: 'CDTFA Combined District',
+    notes: 'California statewide baseline + local transit district.',
+  },
+  {
+    id: 'tax-us-ny',
+    regionName: 'United States - New York (NYC)',
+    taxLabel: 'NYC Sales & Use Tax',
+    rate: 0.08875,
+    countryCode: 'US',
+    jurisdiction: 'NYS Dept of Taxation + NYC',
+    notes: 'Includes NY State 4% + NYC 4.5% + MCTD 0.375%.',
+  },
+  {
+    id: 'tax-us-wa',
+    regionName: 'United States - Washington (Seattle)',
+    taxLabel: 'WA Retail Sales Tax',
+    rate: 0.1025,
+    countryCode: 'US',
+    jurisdiction: 'WA Dept of Revenue + King County',
+    notes: 'RTA transit district combined rate.',
+  },
+  {
+    id: 'tax-us-exempt',
+    regionName: 'United States - Tax Exempt / Wholesale',
+    taxLabel: 'Wholesale Resale Exemption',
+    rate: 0.0,
+    countryCode: 'US',
+    jurisdiction: 'Form 01-339 Resale Certificate',
+    notes: 'Zero tax for registered manufacturing resale or governmental accounts.',
+  },
+  {
+    id: 'tax-eu-de',
+    regionName: 'European Union - Germany (MwSt)',
+    taxLabel: 'Mehrwertsteuer (VAT)',
+    rate: 0.19,
+    countryCode: 'DE',
+    jurisdiction: 'Bundeszentralamt für Steuern',
+    notes: 'German standard VAT 19%.',
+  },
+  {
+    id: 'tax-eu-fr',
+    regionName: 'European Union - France (TVA)',
+    taxLabel: 'Taxe sur la Valeur Ajoutée (VAT)',
+    rate: 0.20,
+    countryCode: 'FR',
+    jurisdiction: 'Direction Générale des Finances Publiques',
+    notes: 'French standard 20% VAT rate.',
+  },
+  {
+    id: 'tax-gb-uk',
+    regionName: 'United Kingdom - Standard VAT',
+    taxLabel: 'HMRC Standard VAT',
+    rate: 0.20,
+    countryCode: 'GB',
+    jurisdiction: 'HM Revenue & Customs',
+    notes: 'UK standard rated supply (20%).',
+  },
+  {
+    id: 'tax-ca-on',
+    regionName: 'Canada - Ontario (HST)',
+    taxLabel: 'Harmonized Sales Tax',
+    rate: 0.13,
+    countryCode: 'CA',
+    jurisdiction: 'Canada Revenue Agency',
+    notes: 'Combines 5% Federal GST + 8% Provincial Ontario component.',
+  },
+  {
+    id: 'tax-au-all',
+    regionName: 'Australia - Nationwide (GST)',
+    taxLabel: 'Goods & Services Tax',
+    rate: 0.10,
+    countryCode: 'AU',
+    jurisdiction: 'Australian Taxation Office (ATO)',
+    notes: 'Uniform 10% Goods and Services Tax on taxable supplies.',
+  },
+  {
+    id: 'tax-jp-all',
+    regionName: 'Japan - Consumption Tax (消費税)',
+    taxLabel: 'Consumption Tax (標準税率)',
+    rate: 0.10,
+    countryCode: 'JP',
+    jurisdiction: 'National Tax Agency Japan (国税庁)',
+    notes: 'National consumption tax (7.8%) + Local consumption tax (2.2%).',
+  },
+];
+
+// Helper functions for loyalty calculation
+export const calculateLoyaltyPointsEarned = (amount: number, tier: PosCustomerProfile['tier']): number => {
+  const multipliers: Record<PosCustomerProfile['tier'], number> = {
+    Bronze: 1.0,
+    Silver: 1.2,
+    Gold: 1.5,
+    Platinum: 2.0,
+  };
+  const multiplier = multipliers[tier] || 1.0;
+  return Math.floor(amount * multiplier);
+};
+
+// 100 points = $5.00 ($0.05 / point)
+export const LOYALTY_REDEMPTION_RATE_PER_POINT = 0.05;
+
+export const formatCurrency = (
+  amountInUsd: number,
+  currency: PosCurrency,
+  showDual = false
+): string => {
+  const converted = amountInUsd * currency.rate;
+  const formattedConverted = `${currency.symbol}${converted.toLocaleString(undefined, {
+    minimumFractionDigits: currency.decimals,
+    maximumFractionDigits: currency.decimals,
+  })} ${currency.code}`;
+
+  if (showDual && currency.code !== 'USD') {
+    return `${formattedConverted} ($${amountInUsd.toFixed(2)} USD)`;
+  }
+  return formattedConverted;
+};

@@ -30,13 +30,15 @@ import {
   PosInvoiceItem,
   Invoice,
   AppUser,
+  PosCurrency,
 } from '../../types';
 
 interface PosInvoiceGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: AppUser;
-  products: PosProduct[];
+  currentUser?: AppUser;
+  products?: PosProduct[];
+  availableProducts?: PosProduct[];
   initialItems?: PosCartItem[];
   customerDefault?: {
     name: string;
@@ -46,6 +48,17 @@ interface PosInvoiceGeneratorModalProps {
     address?: string;
     poReference?: string;
   };
+  customerPreset?: {
+    name: string;
+    company?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    poReference?: string;
+  };
+  regionalTaxRate?: number;
+  regionalTaxLabel?: string;
+  currency?: PosCurrency;
   onAddInvoiceToLedger?: (invoice: Invoice) => void;
   onLoadItemsToCart?: (items: PosCartItem[]) => void;
   onShowNotification?: (title: string, message: string, type?: 'success' | 'warning' | 'info') => void;
@@ -56,12 +69,20 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
   onClose,
   currentUser,
   products,
+  availableProducts,
   initialItems = [],
   customerDefault,
+  customerPreset,
+  regionalTaxRate,
+  regionalTaxLabel,
+  currency,
   onAddInvoiceToLedger,
   onLoadItemsToCart,
   onShowNotification,
 }) => {
+  const effectiveProducts = availableProducts || products || [];
+  const effectiveCustomer = customerPreset || customerDefault;
+  const effectiveTaxRate = regionalTaxRate !== undefined ? regionalTaxRate : 0.0825;
   // Mode: Editor vs Document Preview
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor');
 
@@ -85,12 +106,12 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
   const [poReference, setPoReference] = useState('PO-VRTX-2026-A1');
 
   // Customer / Bill-To details
-  const [customerName, setCustomerName] = useState(customerDefault?.name || 'Boeing Commercial Airplanes');
-  const [customerCompany, setCustomerCompany] = useState(customerDefault?.company || 'Commercial Aircraft Division');
-  const [customerEmail, setCustomerEmail] = useState(customerDefault?.email || 'procurement@boeing.com');
-  const [customerPhone, setCustomerPhone] = useState(customerDefault?.phone || '+1 (425) 266-2121');
+  const [customerName, setCustomerName] = useState(effectiveCustomer?.name || 'Boeing Commercial Airplanes');
+  const [customerCompany, setCustomerCompany] = useState(effectiveCustomer?.company || 'Commercial Aircraft Division');
+  const [customerEmail, setCustomerEmail] = useState(effectiveCustomer?.email || 'procurement@boeing.com');
+  const [customerPhone, setCustomerPhone] = useState(effectiveCustomer?.phone || '+1 (425) 266-2121');
   const [customerAddress, setCustomerAddress] = useState(
-    customerDefault?.address || '7755 E Marginal Way S, Seattle, WA 98108'
+    effectiveCustomer?.address || '7755 E Marginal Way S, Seattle, WA 98108'
   );
 
   // Line items state
@@ -102,7 +123,7 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
         description: item.product.name,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        taxRate: item.product.taxRate,
+        taxRate: item.product.taxRate !== undefined ? item.product.taxRate : effectiveTaxRate,
         total: item.unitPrice * item.quantity,
         category: item.product.category,
         notes: item.notes || '',
@@ -110,11 +131,11 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
     }
 
     // Default sample item if none provided
-    const sampleProduct = products[0] || {
+    const sampleProduct = effectiveProducts[0] || {
       name: 'Precision Titanium Hex Bolt M8x40',
       sku: 'FAS-TI-M8-40',
       price: 18.5,
-      taxRate: 0.0825,
+      taxRate: effectiveTaxRate,
       category: 'Fasteners & Hardware',
     };
 
@@ -125,7 +146,7 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
         description: sampleProduct.name,
         quantity: 1,
         unitPrice: sampleProduct.price,
-        taxRate: sampleProduct.taxRate,
+        taxRate: sampleProduct.taxRate !== undefined ? sampleProduct.taxRate : effectiveTaxRate,
         total: sampleProduct.price,
         category: sampleProduct.category,
         notes: 'Factory calibrated high-tensile specification',
@@ -254,7 +275,7 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
   // Add line item from catalog
   const handleAddFromCatalog = () => {
     if (!selectedCatalogProductId) return;
-    const prod = products.find((p) => p.id === selectedCatalogProductId);
+    const prod = effectiveProducts.find((p) => p.id === selectedCatalogProductId);
     if (!prod) return;
 
     const newItem: PosInvoiceItem = {
@@ -263,7 +284,7 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
       description: prod.name,
       quantity: 1,
       unitPrice: prod.price,
-      taxRate: prod.taxRate,
+      taxRate: prod.taxRate !== undefined ? prod.taxRate : effectiveTaxRate,
       total: prod.price,
       category: prod.category,
       notes: prod.description || '',
@@ -284,7 +305,7 @@ export const PosInvoiceGeneratorModal: React.FC<PosInvoiceGeneratorModalProps> =
       description: 'Precision MRO Machine Calibration & Overhaul Labor',
       quantity: 1,
       unitPrice: 150.0,
-      taxRate: 0.0825,
+      taxRate: effectiveTaxRate,
       total: 150.0,
       category: 'Services & Labor',
       notes: 'Standard certified technician service',

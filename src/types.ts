@@ -9,6 +9,7 @@ export type UserRole =
 export interface RoleDefinition {
   id: UserRole;
   title: string;
+  name?: string;
   department: string;
   badgeColor: string;
   description: string;
@@ -26,6 +27,7 @@ export interface RoleDefinition {
     property_management?: 'admin' | 'write' | 'read' | 'none';
     channel_management?: 'admin' | 'write' | 'read' | 'none';
     user_access_control?: 'admin' | 'write' | 'read' | 'none';
+    rbac?: 'admin' | 'write' | 'read' | 'none';
   };
 }
 
@@ -54,7 +56,8 @@ export type ViewTab =
   | 'workflows'
   | 'integrations'
   | 'reports'
-  | 'rbac';
+  | 'rbac'
+  | 'audit_log';
 
 // Production & ERP Types
 export interface ProductionLine {
@@ -120,6 +123,7 @@ export interface Shipment {
   status: 'ordered' | 'in_transit' | 'customs_hold' | 'out_for_delivery' | 'delivered';
   currentLocation: string;
   eta: string;
+  estimatedDelivery?: string;
   departureDate: string;
   riskFactor: 'low' | 'medium' | 'high';
   riskReason?: string;
@@ -149,9 +153,12 @@ export interface InventoryItem {
   quantityOnHand: number;
   minSafetyStock: number;
   maxCapacity?: number;
+  onOrder?: number;
   unit: string;
   unitCost: number;
   warehouseLocation: string;
+  location?: string;
+  currentStock?: number;
   lotNumber: string;
   lastRestocked: string;
   supplier: string;
@@ -220,6 +227,7 @@ export interface Invoice {
   type: 'receivable' | 'payable';
   counterparty: string;
   amount: number;
+  totalAmount?: number;
   issueDate: string;
   dueDate: string;
   status: 'paid' | 'pending' | 'overdue';
@@ -344,13 +352,17 @@ export interface Facility {
 
 export interface OperationalAlert {
   id: string;
-  type: 'critical_downtime' | 'quality_scrap_spike' | 'supply_chain_delay' | 'sensor_threshold';
+  type: 'critical_downtime' | 'quality_scrap_spike' | 'supply_chain_delay' | 'sensor_threshold' | 'predictive_maintenance';
   title: string;
   description: string;
   timestamp: string;
   lineOrPart: string;
   severity: 'critical' | 'warning' | 'info';
   actionTaken?: string;
+  source?: string;
+  assetId?: string;
+  healthScore?: number;
+  threshold?: number;
 }
 
 export interface AiAutomatedReport {
@@ -391,6 +403,7 @@ export interface SopStep {
   tolerance?: string;
   inputType: 'pass_fail' | 'numeric' | 'torque' | 'text';
   nominalValue?: number;
+  targetValue?: string | number;
   minTolerance?: number;
   maxTolerance?: number;
   unit?: string;
@@ -406,7 +419,9 @@ export interface DigitalTraveler {
   id: string;
   workOrderId: string;
   orderNumber: string;
+  travelerNumber?: string;
   productName: string;
+  partName?: string;
   sku: string;
   batchNumber: string;
   assignedLineId: string;
@@ -420,9 +435,10 @@ export interface DigitalTraveler {
   completedAt?: string;
   inspectionSignOff?: {
     signedBy: string;
-    badgeId: string;
+    badgeId?: string;
     timestamp: string;
     comments: string;
+    signatureHash?: string;
   };
 }
 
@@ -468,7 +484,9 @@ export interface FloorCell {
   name: string;
   code: string;
   type: 'cnc' | 'smt' | 'stamping' | 'coating' | 'assembly' | 'qa' | 'warehouse';
-  status: 'running' | 'idle' | 'maintenance' | 'bottleneck';
+  machineType?: string;
+  machineId?: string;
+  status: 'running' | 'idle' | 'maintenance' | 'bottleneck' | 'active' | 'warning';
   x: number; // grid column (1-12)
   y: number; // grid row (1-8)
   w: number; // col span
@@ -478,9 +496,11 @@ export interface FloorCell {
   telemetry: {
     spindleRpm: number;
     temperatureC: number;
+    tempC?: number;
     vibrationMmS: number;
     powerKw: number;
     toolWearPct: number;
+    [key: string]: any;
   };
   operator: string;
 }
@@ -489,12 +509,14 @@ export interface AgvVehicle {
   id: string;
   name: string;
   code: string;
-  status: 'in_transit' | 'loading' | 'charging';
+  status: 'in_transit' | 'loading' | 'charging' | 'moving' | 'idle';
   batteryPct: number;
   currentBay: string;
   destinationBay: string;
   payload: string;
   progressPct: number;
+  xCoord?: number;
+  yCoord?: number;
 }
 
 // 4. Barcode / QR Label Scanner Types
@@ -637,10 +659,15 @@ export type BreakpointView = 'desktop' | 'tablet' | 'mobile';
 
 export interface DashboardVersionSnapshot {
   id: string;
-  versionNumber: number;
-  timestamp: string;
-  note: string;
+  versionNumber: number | string;
+  timestamp?: string;
+  note?: string;
+  version?: string | number;
+  createdAt?: string;
+  createdBy?: string;
   widgets: DashboardWidget[];
+  changeSummary?: string;
+  notes?: string;
   layoutMode?: LayoutMode;
 }
 
@@ -667,6 +694,8 @@ export interface CustomDashboard {
   streamingEnabled?: boolean;
   widgets: DashboardWidget[];
   versionSnapshots?: DashboardVersionSnapshot[];
+  version?: string | number;
+  versions?: DashboardVersionSnapshot[];
   rbacRolesAllowed?: UserRole[];
   rowLevelSecurityFilter?: string;
   createdByRole: string;
@@ -701,6 +730,7 @@ export interface AppConnectorConfig {
   accountIdentifier?: string;
   apiKeyMasked?: string;
   syncedRecordsCount: number;
+  recordsSyncedCount?: number;
   recordsSummary: string;
   featuresSupported: string[];
   recentSyncedItems?: {
@@ -923,7 +953,7 @@ export interface FleetVehicle {
   model: string;
   manufacturer: string;
   year: number;
-  status: 'en_route' | 'loading' | 'charging' | 'idle' | 'maintenance_hold';
+  status: 'en_route' | 'loading' | 'charging' | 'idle' | 'maintenance_hold' | 'in_mission' | 'moving' | 'maintenance';
   batteryOrFuelPct: number;
   speedKmh: number;
   currentBay: string;
@@ -941,6 +971,19 @@ export interface FleetVehicle {
   callsign?: string;
   batteryPercentage?: number;
   currentLocation?: string;
+  serialNumber?: string;
+  totalDistanceKm?: number;
+  assignedMission?: string;
+  telemetry?: {
+    engineRpm?: number;
+    hydraulicPressureBar?: number;
+    odoKm?: number;
+    tirePressureBar?: number;
+    batteryTempC?: number;
+    coordinates?: { x: number; y: number; heading?: number };
+    speedMps?: number;
+    payloadKg?: number;
+  };
 }
 
 export interface FleetMission {
@@ -950,10 +993,12 @@ export interface FleetMission {
   vehicleCode: string;
   pickupLocation: string;
   dropoffLocation: string;
+  origin?: string;
+  destination?: string;
   payloadType: string;
   payloadWeightKg: number;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  status: 'scheduled' | 'in_transit' | 'completed' | 'canceled';
+  priority: 'low' | 'normal' | 'high' | 'urgent' | 'critical' | 'standard';
+  status: 'scheduled' | 'in_transit' | 'completed' | 'canceled' | 'in_progress' | 'assigned';
   startTime: string;
   estimatedArrival: string;
   completedTime?: string;
@@ -1068,6 +1113,54 @@ export interface SecurityAuditEntry {
 // =============================================================
 // POINT OF SALE (POS) SYSTEM TYPES
 // =============================================================
+// POS & RETAIL REGISTER TYPES
+// =============================================================
+
+export interface PosCustomerProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company?: string;
+  address?: string;
+  tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  loyaltyPoints: number;
+  lifetimePointsEarned: number;
+  lifetimeSpend: number;
+  joinedDate: string;
+  notes?: string;
+  orderHistory: {
+    orderId: string;
+    orderNumber: string;
+    date: string;
+    total: number;
+    pointsEarned: number;
+    pointsRedeemed?: number;
+    currency?: string;
+  }[];
+}
+
+export interface PosCurrency {
+  code: string;
+  symbol: string;
+  name: string;
+  rate: number; // relative to USD base (1 USD = rate * currency)
+  flag: string;
+  decimals: number;
+}
+
+export interface PosTaxRegionConfig {
+  id: string;
+  regionName: string;
+  taxLabel: string; // e.g. "Sales Tax", "VAT", "HST/GST", "GST"
+  rate: number; // e.g. 0.0825 (8.25%)
+  taxRate?: number;
+  countryCode: string;
+  jurisdiction: string;
+  isDefault?: boolean;
+  notes?: string;
+  exemptWholesale?: boolean;
+}
 
 export interface PosProduct {
   id: string;
@@ -1103,13 +1196,22 @@ export interface PosOrder {
   subtotal: number;
   taxTotal: number;
   discountTotal: number;
+  cashDiscountAmount?: number;
+  loyaltyDiscountAmount?: number;
+  loyaltyPointsEarned?: number;
+  loyaltyPointsRedeemed?: number;
   grandTotal: number;
+  total?: number;
   paymentMethod: PosPaymentMethod;
+  guestFolioRoomNumber?: string;
+  billedToReservationId?: string;
   paymentStatus: 'completed' | 'pending' | 'refunded';
   cashierId: string;
   cashierName: string;
+  customerId?: string;
   customerName?: string;
   customerEmail?: string;
+  customerProfileId?: string;
   roomChargeDetails?: {
     reservationId: string;
     unitNumber: string;
@@ -1118,6 +1220,14 @@ export interface PosOrder {
   timestamp: string;
   amountTendered?: number;
   changeDue?: number;
+  currencyCode?: string;
+  currencySymbol?: string;
+  currencyRate?: number;
+  convertedGrandTotal?: number;
+  taxRegionId?: string;
+  taxRegionName?: string;
+  taxRateApplied?: number;
+  taxLabel?: string;
 }
 
 export interface PosRegisterShift {

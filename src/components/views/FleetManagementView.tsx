@@ -45,12 +45,18 @@ export const FleetManagementView: React.FC<FleetManagementViewProps> = ({
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState<boolean>(false);
 
   // New Mission Form State
-  const [newMission, setNewMission] = useState({
+  const [newMission, setNewMission] = useState<{
+    vehicleId: string;
+    pickupLocation: string;
+    dropoffLocation: string;
+    cargoDescription: string;
+    priority: 'standard' | 'high' | 'critical';
+  }>({
     vehicleId: vehicles[0]?.id || '',
     pickupLocation: 'CNC Bay A (Storage Rack 3)',
     dropoffLocation: 'Line 2 - Stamping Bay',
     cargoDescription: '50x Machined Titanium Turbine Flanges',
-    priority: 'high' as const,
+    priority: 'high',
   });
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId) || vehicles[0];

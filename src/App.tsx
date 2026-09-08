@@ -40,46 +40,15 @@ import { BatchCsvUploadModal } from './components/modals/BatchCsvUploadModal';
 import {
   initialRoles,
   initialFacilities,
-  initialLines,
-  initialWorkOrders,
-  initialInventory,
-  initialShipments,
-  initialSuppliers,
-  initialTasks,
-  initialDeals,
-  initialCampaigns,
-  initialFinance,
-  initialInvoices,
-  initialWorkflows,
-  initialConnectors,
-  initialAlerts,
   initialBom,
-  initialTravelers,
-  initialMultiLevelBom,
-  initialFloorCells,
-  initialAgvFleet,
-  initialMaintenanceAssets,
-  initialMaintenanceOrders,
 } from './data/initialData';
-import { initialChartOfAccounts, initialJournalEntries } from './data/accountingData';
-import { initialAppConnectors } from './data/connectorsData';
-import { initialSubAccounts } from './data/subAccountsData';
-import { initialDatabases } from './data/databaseData';
 import {
-  initialAppUsers,
-  initialPosProducts,
-  initialPropertyUnits,
-  initialReservations,
-  initialChannels,
-  initialChannelSyncLogs,
-  initialSecurityAuditLogs,
-} from './data/authAndEnterpriseData';
-import {
-  initialEmployees,
-  initialAttendanceRecords,
-  initialFleetVehicles,
-  initialFleetMissions,
-} from './data/hrAndFleetData';
+  useUIStore,
+  useAuthStore,
+  useErpStore,
+  useFleetAndHrStore,
+  usePosAndPropertyStore,
+} from './stores';
 
 import {
   RoleDefinition,
@@ -131,132 +100,158 @@ import {
 import { CheckCircle2, AlertTriangle, Zap, X } from 'lucide-react';
 
 export default function App() {
-  // Navigation & Role State
-  const [currentRole, setCurrentRole] = useState<RoleDefinition>(initialRoles[0]);
-  const [activeFacility, setActiveFacility] = useState<Facility>(initialFacilities[0]);
-  const [activeView, setActiveView] = useState<string>('custom_dashboards');
+  // Scoped Zustand Store Bindings
+  const {
+    activeView,
+    setActiveView,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    isMobileSidebarOpen,
+    setIsMobileSidebarOpen,
+    toggleSidebar,
+    branding,
+    setBranding,
+    handleSaveBranding: storeSaveBranding,
+    isAiReportOpen,
+    setIsAiReportOpen,
+    isCreateWorkOrderOpen,
+    setIsCreateWorkOrderOpen,
+    isAddInventoryOpen,
+    setIsAddInventoryOpen,
+    isBarcodeScannerOpen,
+    setIsBarcodeScannerOpen,
+    isPrintLabelOpen,
+    setIsPrintLabelOpen,
+    isBrandingModalOpen,
+    setIsBrandingModalOpen,
+    isProductTourOpen,
+    setIsProductTourOpen,
+    isSubDashboardWizardOpen,
+    setIsSubDashboardWizardOpen,
+    isBatchCsvModalOpen,
+    setIsBatchCsvModalOpen,
+    batchCsvDataType,
+    setBatchCsvDataType,
+    toast,
+    showNotification,
+    clearToast,
+  } = useUIStore();
 
-  // Multi-Tenant Authentication & Sub-User RBAC State
-  const [allUsers, setAllUsers] = useState<AppUser[]>(initialAppUsers);
-  const [currentUser, setCurrentUser] = useState<AppUser>(initialAppUsers[0]);
-  const [userAuditLogs, setUserAuditLogs] = useState<SecurityAuditEntry[]>(initialSecurityAuditLogs);
-  const [isLoginPortalOpen, setIsLoginPortalOpen] = useState<boolean>(false);
+  const {
+    currentRole,
+    setCurrentRole,
+    activeFacility,
+    setActiveFacility,
+    currentUser,
+    setCurrentUser,
+    allUsers,
+    setAllUsers,
+    handleAddUser,
+    handleUpdateUserRole,
+    handleToggleUserStatus,
+    userAuditLogs,
+    setUserAuditLogs,
+    userProfile,
+    setUserProfile,
+    isLoginPortalOpen,
+    setIsLoginPortalOpen,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+  } = useAuthStore();
 
-  // Point of Sale (POS) State
-  const [posProducts, setPosProducts] = useState<PosProduct[]>(initialPosProducts);
-  const [posCompletedOrders, setPosCompletedOrders] = useState<PosOrder[]>([]);
+  const {
+    lines,
+    setLines,
+    workOrders,
+    setWorkOrders,
+    inventory,
+    setInventory,
+    shipments,
+    setShipments,
+    suppliers,
+    setSuppliers,
+    tasks,
+    setTasks,
+    deals,
+    setDeals,
+    campaigns,
+    setCampaigns,
+    finance,
+    setFinance,
+    invoices,
+    setInvoices,
+    journalEntries,
+    setJournalEntries,
+    chartOfAccounts,
+    setChartOfAccounts,
+    workflows,
+    setWorkflows,
+    connectors,
+    setConnectors,
+    alerts,
+    setAlerts,
+    travelers,
+    setTravelers,
+    multiLevelBom,
+    setMultiLevelBom,
+    floorCells,
+    setFloorCells,
+    agvFleet,
+    setAgvFleet,
+    maintenanceAssets,
+    setMaintenanceAssets,
+    maintenanceOrders,
+    setMaintenanceOrders,
+    handleTriggerSimulatedAlert,
+    handleTriggerPredictiveMaintenanceAlert,
+  } = useErpStore();
 
-  // Property & Residency Management (PMS) State
-  const [propertyUnits, setPropertyUnits] = useState<PropertyUnit[]>(initialPropertyUnits);
-  const [propertyReservations, setPropertyReservations] = useState<PropertyReservation[]>(initialReservations);
+  const {
+    employees,
+    setEmployees,
+    attendanceRecords,
+    setAttendanceRecords,
+    fleetVehicles,
+    setFleetVehicles,
+    fleetMissions,
+    setFleetMissions,
+    handleAddEmployee,
+    handleUpdateEmployeeStatus,
+    handleUploadEmployeesBatch,
+    handleUpdateVehicleStatus,
+    handleDispatchFleetMission,
+  } = useFleetAndHrStore();
 
-  // OTA Channel Manager (CMS) State
-  const [distributionChannels, setDistributionChannels] = useState<DistributionChannel[]>(initialChannels);
-  const [channelSyncLogs, setChannelSyncLogs] = useState<ChannelSyncEvent[]>(initialChannelSyncLogs);
-
-  // Manufacturing ERP State
-  const [lines, setLines] = useState<ProductionLine[]>(initialLines);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(initialWorkOrders);
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
-  const [shipments, setShipments] = useState<Shipment[]>(initialShipments);
-  const [suppliers, setSuppliers] = useState<SupplierScorecard[]>(initialSuppliers);
-  const [tasks, setTasks] = useState<ProjectTask[]>(initialTasks);
-  const [deals, setDeals] = useState<CrmDeal[]>(initialDeals);
-  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>(initialCampaigns);
-  const [finance, setFinance] = useState<FinanceMetric>(initialFinance);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(initialJournalEntries);
-  const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>(initialChartOfAccounts);
-  const [workflows, setWorkflows] = useState<CustomWorkflow[]>(initialWorkflows);
-  const [connectors, setConnectors] = useState<ApiConnector[]>(initialConnectors);
-  const [alerts, setAlerts] = useState<OperationalAlert[]>(initialAlerts);
-
-  // New Platform Capabilities State
-  const [travelers, setTravelers] = useState<DigitalTraveler[]>(initialTravelers);
-  const [multiLevelBom, setMultiLevelBom] = useState<BomNode[]>(initialMultiLevelBom);
-  const [floorCells, setFloorCells] = useState<FloorCell[]>(initialFloorCells);
-  const [agvFleet, setAgvFleet] = useState<AgvVehicle[]>(initialAgvFleet);
-  const [maintenanceAssets, setMaintenanceAssets] = useState<MaintenanceAsset[]>(initialMaintenanceAssets);
-  const [maintenanceOrders, setMaintenanceOrders] = useState<MaintenanceWorkOrder[]>(initialMaintenanceOrders);
-
-  // Enterprise Connectors, Sub-Accounts & External DB State
-  const [appConnectors, setAppConnectors] = useState<AppConnectorConfig[]>(initialAppConnectors);
-  const [subAccounts, setSubAccounts] = useState<SubAccount[]>(initialSubAccounts);
-  const [activeViewingSubAccountId, setActiveViewingSubAccountId] = useState<string | null>(null);
-  const [customDatabases, setCustomDatabases] = useState<DatabaseConnection[]>(initialDatabases);
-
-  // Workforce HR & Fleet Robotics State
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
-  const [attendanceRecords, setAttendanceRecords] = useState<HrAttendanceRecord[]>(initialAttendanceRecords);
-  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>(initialFleetVehicles);
-  const [fleetMissions, setFleetMissions] = useState<FleetMission[]>(initialFleetMissions);
-
-  // Company Branding & White-Labeling State
-  const [branding, setBranding] = useState<CompanyBranding>(() => {
-    try {
-      const saved = localStorage.getItem('vortix_branding');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      // fallback
-    }
-    return {
-      companyName: 'Vortix Manufacturing Corp',
-      dashboardTitle: 'Global Industrial Operations & Telemetry Cockpit',
-      tagline: 'Build. Scale. Orchestrate.',
-      logoType: 'vortix',
-      logoText: 'VORTIX',
-      primaryColor: '#5A5A40',
-      accentColor: '#2D2D24',
-      headerBgColor: '#FFFFFF',
-      themePreset: 'industrial_earth',
-      showPoweredByVortix: true,
-    };
-  });
-
-  // User Profile & Onboarding State
-  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    try {
-      const saved = localStorage.getItem('vortix_user_profile');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      // fallback
-    }
-    return {
-      id: 'usr-default-1',
-      fullName: 'Marcus Vance',
-      email: 'mmzzdevs@gmail.com',
-      companyName: 'Vortix Manufacturing Corp',
-      role: 'VP of Manufacturing & Operations',
-      industry: 'Precision Engineering & Robotics',
-      isAuthenticated: true,
-      onboardingCompleted: true,
-      lastLoginAt: 'Today at 08:30 AM',
-      createdAt: new Date().toISOString(),
-    };
-  });
-
-  // Modals
-  const [isAiReportOpen, setIsAiReportOpen] = useState(false);
-  const [isCreateWorkOrderOpen, setIsCreateWorkOrderOpen] = useState(false);
-  const [isAddInventoryOpen, setIsAddInventoryOpen] = useState(false);
-  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
-  const [isPrintLabelOpen, setIsPrintLabelOpen] = useState(false);
-  const [isBrandingModalOpen, setIsBrandingModalOpen] = useState(false);
-  const [isProductTourOpen, setIsProductTourOpen] = useState(false);
-  const [isSubDashboardWizardOpen, setIsSubDashboardWizardOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isBatchCsvModalOpen, setIsBatchCsvModalOpen] = useState(false);
-  const [batchCsvDataType, setBatchCsvDataType] = useState<'inventory' | 'employee'>('inventory');
-
-  // Collapsible Navigation & Mobile Drawer State
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('vortix_sidebar_collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const {
+    posProducts,
+    setPosProducts,
+    posCompletedOrders,
+    setPosCompletedOrders,
+    propertyUnits,
+    setPropertyUnits,
+    propertyReservations,
+    setPropertyReservations,
+    distributionChannels,
+    setDistributionChannels,
+    channelSyncLogs,
+    setChannelSyncLogs,
+    subAccounts,
+    setSubAccounts,
+    activeViewingSubAccountId,
+    setActiveViewingSubAccountId,
+    customDatabases,
+    setCustomDatabases,
+    appConnectors,
+    setAppConnectors,
+    handleToggleConnector,
+    handleCompletePosOrder,
+    handleRefundPosOrder,
+    handleUpdateUnitStatus,
+    handleCheckInReservation,
+    handleCheckOutReservation,
+    handleToggleChannelStatus,
+    handleTriggerChannelSync,
+  } = usePosAndPropertyStore();
 
   // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar collapse
   useEffect(() => {
@@ -320,14 +315,6 @@ export default function App() {
     showNotification('Profile Saved', `Welcome back, ${profile.fullName}!`);
   };
 
-  const handleAddEmployee = (emp: Employee) => {
-    setEmployees((prev) => [emp, ...prev]);
-  };
-
-  const handleUpdateEmployeeStatus = (id: string, status: Employee['status']) => {
-    setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
-  };
-
   const handleUploadInventoryBatch = (items: InventoryItem[], mode: 'append' | 'update') => {
     setInventory((prev) => {
       if (mode === 'append') {
@@ -368,59 +355,10 @@ export default function App() {
     );
   };
 
-  const handleUploadEmployeesBatch = (uploadedEmployees: Employee[], mode: 'append' | 'update') => {
-    setEmployees((prev) => {
-      if (mode === 'append') {
-        return [...prev, ...uploadedEmployees];
-      }
-      const map = new Map<string, Employee>();
-      prev.forEach((emp) => map.set(emp.employeeCode.toLowerCase(), emp));
-      uploadedEmployees.forEach((emp) => {
-        const key = emp.employeeCode.toLowerCase();
-        const existing =
-          map.get(key) ||
-          Array.from(map.values()).find((e) => e.email.toLowerCase() === emp.email.toLowerCase());
-        if (existing) {
-          map.set(existing.employeeCode.toLowerCase(), { ...existing, ...emp, id: existing.id });
-        } else {
-          map.set(key, emp);
-        }
-      });
-      return Array.from(map.values());
-    });
-
-    showNotification(
-      'Workforce Batch Processed',
-      `Processed ${uploadedEmployees.length} employee records via CSV (${mode.toUpperCase()} mode).`
-    );
-  };
-
-  const handleDispatchFleetMission = (mission: FleetMission) => {
-    setFleetMissions((prev) => [mission, ...prev]);
-  };
-
-  const handleUpdateVehicleStatus = (vehicleId: string, status: FleetVehicle['status']) => {
-    setFleetVehicles((prev) =>
-      prev.map((v) => (v.id === vehicleId ? { ...v, status } : v))
-    );
-  };
-
   const handleSubDashboardCreated = (newDash: CustomDashboard) => {
     // Notify user and navigate to custom dashboards view
     showNotification('Sub-Dashboard Deployed', `"${newDash.name}" created with ${newDash.widgets.length} operational tools.`);
     setActiveView('custom_dashboards');
-  };
-
-  // Notification Toast
-  const [toast, setToast] = useState<{ id: string; title: string; message: string; type: 'success' | 'alert' } | null>(
-    null
-  );
-
-  const showNotification = (title: string, message: string, type: 'success' | 'alert' = 'success') => {
-    setToast({ id: Date.now().toString(), title, message, type });
-    setTimeout(() => {
-      setToast(null);
-    }, 4500);
   };
 
   // Digital Traveler & SOP Handlers
@@ -928,7 +866,7 @@ export default function App() {
       <Sidebar
         activeView={activeView}
         onSelectView={(view) => {
-          setActiveView(view);
+          setActiveView(view as ViewTab);
           setIsMobileSidebarOpen(false);
         }}
         currentRole={currentRole}
@@ -1535,7 +1473,7 @@ export default function App() {
       <ProductTourModal
         isOpen={isProductTourOpen}
         onClose={() => setIsProductTourOpen(false)}
-        onNavigateToView={(view) => setActiveView(view)}
+        onNavigateToView={(view) => setActiveView(view as ViewTab)}
         onOpenSubDashboardWizard={() => {
           setIsProductTourOpen(false);
           setIsSubDashboardWizardOpen(true);
@@ -1618,7 +1556,7 @@ export default function App() {
             <p className="text-[#A09E8E] mt-0.5 leading-relaxed">{toast.message}</p>
           </div>
           <button
-            onClick={() => setToast(null)}
+            onClick={() => clearToast()}
             className="text-[#A09E8E] hover:text-white text-sm cursor-pointer"
           >
             <X className="w-4 h-4" />

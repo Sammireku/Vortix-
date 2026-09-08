@@ -389,7 +389,7 @@ export const BrandingSettingsModal: React.FC<BrandingSettingsModalProps> = ({
                   style={{ backgroundColor: formData.primaryColor }}
                 >
                   {formData.logoType === 'vortix' ? (
-                    <VortixLogo size="sm" variant="mark" theme="dark" />
+                    <VortixLogo size="sm" variant="icon" theme="dark" />
                   ) : formData.logoType === 'preset_icon' ? (
                     <Factory className="w-4 h-4 text-white" />
                   ) : formData.logoType === 'custom_url' && formData.customLogoUrl ? (
