@@ -275,7 +275,12 @@ export const ProductTourModal: React.FC<ProductTourModalProps> = ({
   const currentStep = tourSteps[currentStepIndex];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="product-tour-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
       <div className="bg-white border border-[#E5E5DE] rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[92vh]">
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-[#E5E5DE] flex items-center justify-between bg-[#FAF9F5]">
@@ -283,7 +288,7 @@ export const ProductTourModal: React.FC<ProductTourModalProps> = ({
             <VortixLogo size="sm" variant="badge" theme="light" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-serif font-bold text-base text-[#2D2D24]">Vortix Product Guide & System Walkthrough</h3>
+                <h3 id="product-tour-title" className="font-serif font-bold text-base text-[#2D2D24]">Vortix Product Guide & System Walkthrough</h3>
                 <span className="text-[10px] bg-[#5A5A40]/10 text-[#5A5A40] font-semibold px-2 py-0.5 rounded-full border border-[#5A5A40]/20">
                   Step {currentStep.stepNumber} of {tourSteps.length}
                 </span>
@@ -295,6 +300,7 @@ export const ProductTourModal: React.FC<ProductTourModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close product guide modal"
             className="p-1.5 rounded-xl text-[#8B7E66] hover:text-[#2D2D24] hover:bg-[#E9E9E0] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -339,9 +345,9 @@ export const ProductTourModal: React.FC<ProductTourModalProps> = ({
               Functions & Buttons Explained:
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {currentStep.keyFunctions.map((fn, i) => (
+              {currentStep.keyFunctions.map((fn) => (
                 <div
-                  key={i}
+                  key={`fn-${fn.name}-${fn.buttonLabel}`}
                   className="bg-[#FAF9F5] border border-[#E5E5DE] rounded-2xl p-3.5 space-y-1.5 hover:border-[#C4C4B8] transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2">

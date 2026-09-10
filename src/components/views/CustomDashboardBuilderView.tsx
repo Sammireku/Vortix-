@@ -73,6 +73,7 @@ import {
   MrpRequirement,
   RoleDefinition,
   ViewTab,
+  DashboardVersionSnapshot,
   WidgetType,
   WidgetCategory,
   Invoice,
@@ -501,7 +502,7 @@ export const CustomDashboardBuilderView: React.FC<CustomDashboardBuilderViewProp
   };
 
   // Rollback to specific version snapshot
-  const handleRollbackVersion = (ver: any) => {
+  const handleRollbackVersion = (ver: DashboardVersionSnapshot) => {
     setDashboards((prev) =>
       prev.map((d) =>
         d.id === activeDashboard.id

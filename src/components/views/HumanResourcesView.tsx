@@ -410,9 +410,9 @@ export const HumanResourcesView: React.FC<HumanResourcesViewProps> = ({
 
                   {/* Skills Chips */}
                   <div className="flex flex-wrap gap-1">
-                    {emp.skills.map((sk, i) => (
+                    {emp.skills.map((sk) => (
                       <span
-                        key={i}
+                        key={`emp-skill-${emp.id}-${sk}`}
                         className="text-[9px] bg-white text-[#787668] border border-[#E5E5DE] px-2 py-0.5 rounded-md font-medium"
                       >
                         {sk}

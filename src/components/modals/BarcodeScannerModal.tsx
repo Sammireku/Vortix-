@@ -67,7 +67,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       } else {
         setCameraError('Camera API not accessible in this container environment. Use the quick scanner emulator below.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setCameraError('Camera permission not granted or device camera unavailable. Use the quick scanner below.');
       setCameraActive(false);
     }
@@ -111,17 +111,23 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const resolved = scannedCode ? resolveScannedEntity(scannedCode) : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#2D2D24]/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scanner-modal-title"
+      className="fixed inset-0 z-50 bg-[#2D2D24]/60 backdrop-blur-xs flex items-center justify-center p-4"
+    >
       <div className="bg-white rounded-3xl p-6 max-w-lg w-full border border-[#E5E5DE] shadow-2xl animate-in zoom-in-95 duration-150 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-2 border-b border-[#E5E5DE]">
           <div className="flex items-center gap-2">
             <QrCode className="w-5 h-5 text-[#5A5A40]" />
-            <h3 className="font-serif font-bold text-lg text-[#2D2D24]">
+            <h3 id="scanner-modal-title" className="font-serif font-bold text-lg text-[#2D2D24]">
               Optical Barcode & QR Code Scanner
             </h3>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close optical scanner modal"
             className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F5F5F0] text-[#787668] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />

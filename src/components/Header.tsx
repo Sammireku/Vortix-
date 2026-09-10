@@ -25,13 +25,13 @@ import { VortixLogo } from './VortixLogo';
 interface HeaderProps {
   currentRole: RoleDefinition;
   roles: RoleDefinition[];
-  onSelectRole: (role: any) => void;
+  onSelectRole: (role: RoleDefinition) => void;
   currentUser?: AppUser;
   onOpenLoginPortal?: () => void;
   facilities?: Facility[];
   activeFacility: Facility | string;
-  onSelectFacility?: (facility: any) => void;
-  onChangeFacility?: (facility: any) => void;
+  onSelectFacility?: (facility: Facility) => void;
+  onChangeFacility?: (facility: Facility) => void;
   alertCount?: number;
   onOpenAlertsModal?: () => void;
   onQuickGenerateReport?: () => void;

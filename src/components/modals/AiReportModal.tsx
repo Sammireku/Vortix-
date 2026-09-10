@@ -17,7 +17,7 @@ import { AiAutomatedReport } from '../../types';
 interface AiReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productionData: any;
+  productionData: Record<string, unknown>;
   onApplyRecommendation?: (rec: string) => void;
 }
 
@@ -56,8 +56,8 @@ export const AiReportModal: React.FC<AiReportModalProps> = ({
 
       const data = await response.json();
       setReport(data);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error communicating with AI engine');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error communicating with AI engine');
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +68,12 @@ export const AiReportModal: React.FC<AiReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#2D2D24]/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-report-modal-title"
+      className="fixed inset-0 z-50 bg-[#2D2D24]/60 backdrop-blur-xs flex items-center justify-center p-4"
+    >
       <div className="bg-white border border-[#E5E5DE] rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl text-[#2D2D24]">
         {/* Modal Header */}
         <div className="p-6 border-b border-[#E5E5DE] flex items-center justify-between bg-white">
@@ -77,7 +82,7 @@ export const AiReportModal: React.FC<AiReportModalProps> = ({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-serif italic font-semibold text-[#2D2D24] flex items-center gap-2">
+              <h2 id="ai-report-modal-title" className="text-lg font-serif italic font-semibold text-[#2D2D24] flex items-center gap-2">
                 Automated Manufacturing Intelligence Report
                 <span className="text-[10px] font-sans not-italic font-semibold bg-[#5A5A40]/15 text-[#5A5A40] border border-[#5A5A40]/30 px-2.5 py-0.5 rounded-full">
                   Gemini Flash Powered
@@ -90,6 +95,7 @@ export const AiReportModal: React.FC<AiReportModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close report modal"
             className="text-[#787668] hover:text-[#2D2D24] p-1.5 rounded-xl hover:bg-[#F5F5F0] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -189,7 +195,7 @@ export const AiReportModal: React.FC<AiReportModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {report.keyFindings.map((finding, idx) => (
                     <div
-                      key={idx}
+                      key={`finding-${idx}-${finding.substring(0, 20)}`}
                       className="p-4 rounded-2xl bg-white border border-[#E5E5DE] text-[11px] text-[#787668] shadow-xs"
                     >
                       <div className="font-semibold text-[#2D2D24] mb-1 flex items-center gap-1.5">
@@ -210,7 +216,7 @@ export const AiReportModal: React.FC<AiReportModalProps> = ({
                 <div className="space-y-2.5">
                   {report.recommendations.map((rec, idx) => (
                     <div
-                      key={idx}
+                      key={`rec-${idx}-${rec.substring(0, 20)}`}
                       className="p-4 rounded-2xl bg-white border border-[#E5E5DE] flex items-start justify-between gap-3 shadow-xs"
                     >
                       <div className="text-[#787668] text-xs leading-relaxed">

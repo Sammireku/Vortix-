@@ -379,8 +379,8 @@ export const PropertyManagementView: React.FC<PropertyManagementViewProps> = ({
                   <th className="p-3.5 min-w-[200px] sticky left-0 bg-[#F5F5F0] z-10 border-r border-[#E5E5DE]">
                     Unit & Property
                   </th>
-                  {calendarDates.map((cd, i) => (
-                    <th key={i} className="p-2.5 text-center min-w-[95px] border-l border-[#E5E5DE]">
+                  {calendarDates.map((cd) => (
+                    <th key={`cal-header-${cd.day}-${cd.date}`} className="p-2.5 text-center min-w-[95px] border-l border-[#E5E5DE]">
                       <div className="text-[10px] text-[#8B7E66]">{cd.day}</div>
                       <div className="font-bold text-[#2D2D24]">{cd.date}</div>
                     </th>

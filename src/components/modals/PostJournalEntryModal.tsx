@@ -52,7 +52,7 @@ export const PostJournalEntryModal: React.FC<PostJournalEntryModalProps> = ({
     setLines((prev) => prev.filter((l) => l.id !== id));
   };
 
-  const handleUpdateLine = (id: string, field: keyof FormLine, value: any) => {
+  const handleUpdateLine = (id: string, field: keyof FormLine, value: string | number) => {
     setLines((prev) =>
       prev.map((l) => {
         if (l.id !== id) return l;
@@ -92,7 +92,12 @@ export const PostJournalEntryModal: React.FC<PostJournalEntryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#2D2D24]/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="journal-entry-modal-title"
+      className="fixed inset-0 z-50 bg-[#2D2D24]/60 backdrop-blur-xs flex items-center justify-center p-4"
+    >
       <div className="bg-white rounded-3xl p-6 max-w-2xl w-full border border-[#E5E5DE] shadow-2xl space-y-4 animate-in fade-in duration-150 text-[#2D2D24]">
         <div className="flex items-center justify-between pb-3 border-b border-[#E5E5DE]">
           <div className="flex items-center gap-2">
@@ -100,7 +105,7 @@ export const PostJournalEntryModal: React.FC<PostJournalEntryModalProps> = ({
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-serif font-bold text-base text-[#2D2D24]">
+              <h3 id="journal-entry-modal-title" className="font-serif font-bold text-base text-[#2D2D24]">
                 Post General Ledger Journal Entry
               </h3>
               <p className="text-xs text-[#8B7E66]">
@@ -110,6 +115,7 @@ export const PostJournalEntryModal: React.FC<PostJournalEntryModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close journal entry modal"
             className="p-1.5 rounded-full hover:bg-[#F5F5F0] text-[#787668] cursor-pointer"
           >
             <X className="w-4 h-4" />

@@ -389,8 +389,8 @@ export const BatchCsvUploadModal: React.FC<BatchCsvUploadModalProps> = ({
                   <div className="text-xs font-semibold text-red-800 flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" /> Review the following row issues:
                   </div>
-                  {currentResult.errors.map((err, idx) => (
-                    <div key={idx} className="text-[11px] text-red-700 font-mono flex items-start gap-1">
+                  {currentResult.errors.map((err) => (
+                    <div key={`csv-err-${err.rowNumber}-${err.reason.substring(0, 20)}`} className="text-[11px] text-red-700 font-mono flex items-start gap-1">
                       <span className="font-semibold text-red-900">Line {err.rowNumber}:</span> {err.reason}
                     </div>
                   ))}

@@ -396,7 +396,7 @@ export const WorkflowBuilderView: React.FC<WorkflowBuilderViewProps> = ({
                   ) : (
                     simulationLogs.map((log, i) => (
                       <div
-                        key={i}
+                        key={`sim-log-${log.substring(0, 24)}-${i}`}
                         className={
                           log.includes('MATCHED') || log.includes('Status 200')
                             ? 'text-[#C5BAA8]'

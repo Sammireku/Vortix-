@@ -24,7 +24,7 @@ import {
   ToggleRight,
   Eye,
 } from 'lucide-react';
-import { SubAccount, RoleDefinition, SubAccountFeaturePermissions } from '../../types';
+import { SubAccount, RoleDefinition, SubAccountFeaturePermissions, ViewTab } from '../../types';
 import { calculateMasterRollup } from '../../data/subAccountsData';
 
 interface SubAccountsViewProps {
@@ -34,7 +34,7 @@ interface SubAccountsViewProps {
   onUpdateSubAccount: (account: SubAccount) => void;
   activeViewingSubAccountId: string | null;
   onSetActiveViewingSubAccountId: (id: string | null) => void;
-  onNavigateTab: (tab: any) => void;
+  onNavigateTab: (tab: ViewTab) => void;
 }
 
 export const SubAccountsView: React.FC<SubAccountsViewProps> = ({
@@ -566,7 +566,7 @@ export const SubAccountsView: React.FC<SubAccountsViewProps> = ({
                   <label className="font-semibold text-[#2D2D24]">Entity Classification</label>
                   <select
                     value={newAccount.entityType}
-                    onChange={(e: any) => setNewAccount({ ...newAccount, entityType: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewAccount({ ...newAccount, entityType: e.target.value as SubAccount['entityType'] })}
                     className="w-full bg-[#F5F5F0] border border-[#E5E5DE] rounded-xl p-2.5 text-xs text-[#2D2D24] outline-none focus:border-[#5A5A40]"
                   >
                     <option value="Subsidiary Plant">Subsidiary Plant</option>

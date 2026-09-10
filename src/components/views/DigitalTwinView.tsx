@@ -732,7 +732,7 @@ export const DigitalTwinView: React.FC<DigitalTwinViewProps> = ({
                   boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
                   fontSize: '11px'
                 }}
-                formatter={(val: any) => [`${val} °${chartTempUnit}`, 'Core Temp']}
+                formatter={(val: number | string) => [`${val} °${chartTempUnit}`, 'Core Temp']}
                 labelStyle={{ fontWeight: 'bold', color: '#2D2D24' }}
               />
               <ReferenceLine

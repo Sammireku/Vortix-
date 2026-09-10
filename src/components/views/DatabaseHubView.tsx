@@ -30,12 +30,13 @@ import {
   VisualQueryDefinition,
   SqlQueryExecutionResult,
   RoleDefinition,
+  ViewTab,
 } from '../../types';
 import { initialDatabases, sampleVisualQueries, sampleQueryExecutionData } from '../../data/databaseData';
 
 interface DatabaseHubViewProps {
   currentRole: RoleDefinition;
-  onNavigateTab: (tab: any) => void;
+  onNavigateTab: (tab: ViewTab) => void;
   onBindQueryToDashboard?: (queryName: string, sqlOrDefinition: string) => void;
 }
 
@@ -605,9 +606,9 @@ export const DatabaseHubView: React.FC<DatabaseHubViewProps> = ({
                     />
                     <select
                       value={flt.operator}
-                      onChange={(e: any) => {
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                         const updated = [...visualQuery.filters];
-                        updated[idx].operator = e.target.value;
+                        updated[idx].operator = e.target.value as VisualQueryDefinition['filters'][0]['operator'];
                         setVisualQuery({ ...visualQuery, filters: updated });
                       }}
                       className="bg-white border border-[#E5E5DE] rounded-lg p-1.5 font-mono text-xs text-[#2D2D24]"
@@ -762,15 +763,18 @@ export const DatabaseHubView: React.FC<DatabaseHubViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E5E5DE]">
-                    {sqlResult.rows.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-[#F9F9F7]">
-                        {sqlResult.columns.map((c) => (
-                          <td key={c} className="p-3 font-mono text-[#2D2D24]">
-                            {String(row[c] ?? '')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {sqlResult.rows.map((row, idx) => {
+                      const rowKey = row.id ? String(row.id) : (row._id ? String(row._id) : `sql-row-${idx}-${String(row[sqlResult.columns[0]] ?? '')}`);
+                      return (
+                        <tr key={rowKey} className="hover:bg-[#F9F9F7]">
+                          {sqlResult.columns.map((c) => (
+                            <td key={c} className="p-3 font-mono text-[#2D2D24]">
+                              {String(row[c] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -821,7 +825,7 @@ export const DatabaseHubView: React.FC<DatabaseHubViewProps> = ({
                   <label className="font-semibold text-[#2D2D24]">Database Engine</label>
                   <select
                     value={newDb.engine}
-                    onChange={(e: any) => setNewDb({ ...newDb, engine: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewDb({ ...newDb, engine: e.target.value as DatabaseEngineType })}
                     className="w-full bg-[#F5F5F0] border border-[#E5E5DE] rounded-xl p-2.5 text-xs text-[#2D2D24] outline-none focus:border-[#5A5A40]"
                   >
                     <option value="postgresql">PostgreSQL</option>

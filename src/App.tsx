@@ -798,8 +798,8 @@ export default function App() {
       const data = await res.json();
       showNotification('Webhook Dispatched', `${connector.name} responded with status 200.`);
       return { success: true, message: data.message || 'Webhook processed successfully' };
-    } catch (e: any) {
-      return { success: false, message: e.message || 'Webhook connection error' };
+    } catch (e: unknown) {
+      return { success: false, message: e instanceof Error ? e.message : 'Webhook connection error' };
     }
   };
 

@@ -99,14 +99,19 @@ export const LoginPortalModal: React.FC<LoginPortalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="login-portal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
       <div className="bg-white border border-[#E5E5DE] rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="p-5 border-b border-[#E5E5DE] flex items-center justify-between bg-[#FAF9F5]">
           <div className="flex items-center gap-3">
             <VortixLogo size="sm" variant="badge" theme="light" />
             <div>
-              <h3 className="font-serif font-bold text-base text-[#2D2D24]">
+              <h3 id="login-portal-title" className="font-serif font-bold text-base text-[#2D2D24]">
                 Vortix Authentication & User Access
               </h3>
               <p className="text-[11px] text-[#8B7E66]">
@@ -116,6 +121,7 @@ export const LoginPortalModal: React.FC<LoginPortalModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close authentication portal"
             className="p-1.5 rounded-xl text-[#8B7E66] hover:text-[#2D2D24] hover:bg-[#E9E9E0] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -249,9 +255,9 @@ export const LoginPortalModal: React.FC<LoginPortalModalProps> = ({
 
               {/* PIN Bubbles */}
               <div className="flex justify-center gap-3 my-4">
-                {[0, 1, 2, 3].map((idx) => (
+                {['pin-dot-1', 'pin-dot-2', 'pin-dot-3', 'pin-dot-4'].map((dotKey, idx) => (
                   <div
-                    key={idx}
+                    key={dotKey}
                     className={`w-4 h-4 rounded-full border-2 transition-all ${
                       pinInput.length > idx
                         ? 'bg-[#5A5A40] border-[#5A5A40] scale-110'

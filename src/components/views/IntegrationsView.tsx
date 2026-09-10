@@ -33,7 +33,7 @@ interface IntegrationsViewProps {
   onUpdateConnectorConfig?: (config: AppConnectorConfig) => void;
   legacyConnectors?: ApiConnector[];
   onToggleLegacyConnector?: (id: string) => void;
-  onTestWebhook?: (connector: any) => Promise<{ success: boolean; message: string }>;
+  onTestWebhook?: (connector: ApiConnector | AppConnectorConfig) => Promise<{ success: boolean; message: string }>;
 }
 
 export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
@@ -107,6 +107,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
           type: 'webhook',
           status: 'connected',
           endpointUrl: customEndpoint,
+          description: 'Simulated inbound webhook gateway for payload testing',
         });
         setTestResult({ id: 'sim-webhook', success: res.success, msg: res.message });
       } else {
@@ -116,8 +117,8 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
           msg: `HTTP 200 OK — Payload ingested & dispatched to ERP event bus.`,
         });
       }
-    } catch (err: any) {
-      setTestResult({ id: 'sim-webhook', success: false, msg: err.message || 'Webhook failed' });
+    } catch (err: unknown) {
+      setTestResult({ id: 'sim-webhook', success: false, msg: err instanceof Error ? err.message : 'Webhook failed' });
     }
   };
 
@@ -394,8 +395,8 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                   <label className="font-semibold text-[#2D2D24]">Sync Frequency</label>
                   <select
                     value={selectedConnector.syncFrequency}
-                    onChange={(e: any) =>
-                      setSelectedConnector({ ...selectedConnector, syncFrequency: e.target.value })
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setSelectedConnector({ ...selectedConnector, syncFrequency: e.target.value as AppConnectorConfig['syncFrequency'] })
                     }
                     className="w-full bg-[#F5F5F0] border border-[#E5E5DE] rounded-xl p-2.5 text-xs text-[#2D2D24] outline-none focus:border-[#5A5A40]"
                   >

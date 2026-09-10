@@ -54,6 +54,7 @@ import {
 import {
   RoleDefinition,
   MaintenanceAsset,
+  MaintenanceWorkOrder,
   IoTSensorDevice,
   IoTGateway,
   IoTTelemetryReading,
@@ -71,7 +72,7 @@ interface IoTEdgeAnalyticsViewProps {
   currentRole: RoleDefinition;
   maintenanceAssets?: MaintenanceAsset[];
   initialSelectedAssetId?: string;
-  onCreateWorkOrder?: (order: any) => void;
+  onCreateWorkOrder?: (order: Partial<MaintenanceWorkOrder>) => void;
   onNavigateToMaintenance?: () => void;
   onNavigateToDigitalTwin?: () => void;
 }
@@ -608,7 +609,7 @@ export const IoTEdgeAnalyticsView: React.FC<IoTEdgeAnalyticsViewProps> = ({
         assetId: target.id,
         assetName: target.name,
         title: `Predictive Maintenance: ${target.name} (RUL: ${targetRul.rulPercent}%)`,
-        type: 'predictive',
+        type: 'preventative',
         priority: targetRul.healthStatus === 'critical' ? 'critical' : targetRul.healthStatus === 'moderate' ? 'high' : 'medium',
         scheduledDate: new Date().toISOString().split('T')[0],
         assignedTechnician: target.technicianAssigned || 'Master Technician',
@@ -1524,7 +1525,7 @@ export const IoTEdgeAnalyticsView: React.FC<IoTEdgeAnalyticsViewProps> = ({
                           boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                           fontSize: '11px'
                         }}
-                        formatter={(val: any) => [`${val} ${temperatureUnit === 'C' ? '°C' : '°F'}`, 'Temperature']}
+                        formatter={(val: number | string) => [`${val} ${temperatureUnit === 'C' ? '°C' : '°F'}`, 'Temperature']}
                         labelStyle={{ fontWeight: 'bold', color: '#2D2D24' }}
                       />
                       <ReferenceLine y={temperatureUnit === 'C' ? 60 : 140} stroke="#d97706" strokeDasharray="4 4" />
@@ -1637,7 +1638,7 @@ export const IoTEdgeAnalyticsView: React.FC<IoTEdgeAnalyticsViewProps> = ({
                           boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                           fontSize: '11px'
                         }}
-                        formatter={(val: any) => [`${val} mm/s`, 'Vibration RMS']}
+                        formatter={(val: number | string) => [`${val} mm/s`, 'Vibration RMS']}
                         labelStyle={{ fontWeight: 'bold', color: '#2D2D24' }}
                       />
                       <ReferenceLine y={2.8} stroke="#d97706" strokeDasharray="4 4" />
@@ -1747,7 +1748,7 @@ export const IoTEdgeAnalyticsView: React.FC<IoTEdgeAnalyticsViewProps> = ({
                           boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                           fontSize: '11px'
                         }}
-                        formatter={(val: any) => [`${val} %RH`, 'Relative Humidity']}
+                        formatter={(val: number | string) => [`${val} %RH`, 'Relative Humidity']}
                         labelStyle={{ fontWeight: 'bold', color: '#2D2D24' }}
                       />
                       <ReferenceLine y={65} stroke="#d97706" strokeDasharray="4 4" />

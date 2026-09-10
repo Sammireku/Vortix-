@@ -313,8 +313,8 @@ export const MaintenanceCmmsView: React.FC<MaintenanceCmmsViewProps> = ({
                     Spare Parts & Consumables Consumed
                   </h4>
                   <div className="bg-[#F5F5F0] rounded-xl p-3 border border-[#E5E5DE] space-y-1.5 text-xs">
-                    {selectedOrder.spareParts.map((part, idx) => (
-                      <div key={idx} className="flex justify-between text-[#525244]">
+                    {selectedOrder.spareParts.map((part) => (
+                      <div key={`part-${part.partName}-${part.quantity}`} className="flex justify-between text-[#525244]">
                         <span>{part.partName} &times; {part.quantity}</span>
                         <span className="font-mono font-semibold text-[#2D2D24]">${part.cost.toFixed(2)}</span>
                       </div>

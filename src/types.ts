@@ -500,7 +500,7 @@ export interface FloorCell {
     vibrationMmS: number;
     powerKw: number;
     toolWearPct: number;
-    [key: string]: any;
+    [key: string]: number | string | boolean | undefined;
   };
   operator: string;
 }
